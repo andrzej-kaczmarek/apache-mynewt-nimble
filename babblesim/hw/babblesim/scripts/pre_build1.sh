@@ -60,10 +60,3 @@ ln -nsf $BSIM_OUT_PATH/components
 
 # Copy all .32.a files
 find $BSIM_OUT_PATH/lib/$lib -name "*.32.a" -type f -exec cp -t src -f {} \;
-
-# XXX: Workaround for bad linking by newt. Sometimes newt will link
-# nrf weak functions from nrf_hal_originals.o instead of their BabbleSim
-# replacements inside libNRF52_hw_models.32.a. But as long as the other
-# weak functions, that do not have their replacements, are not used,
-# we can just remove the file from the .a library here.
-ar d src/libNRF52_hw_models.32.a nrf_hal_originals.o

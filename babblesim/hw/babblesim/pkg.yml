@@ -27,7 +27,6 @@ pkg.type: sdk
 pkg.include_dirs:
   - components/ext_NRF52_hw_models/src/nrfx/mdk_replacements
   - components/ext_NRF52_hw_models/src/HW_models
-  - components/ext_NRF52_hw_models/src/nrfx_config
   - components/ext_NRF52_hw_models/src/nrfx/nrfx_replacements
   - components/libUtilv1/src/
   - components/libPhyComv1/src/
