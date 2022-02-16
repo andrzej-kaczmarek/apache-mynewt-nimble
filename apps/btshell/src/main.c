@@ -17,6 +17,10 @@
  * under the License.
  */
 
+#ifdef BABBLESIM
+#include "babblesim/babblesim.h"
+#endif
+
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
@@ -2557,8 +2561,8 @@ btshell_init_ext_adv_restart(void)
  *
  * @return int NOTE: this function should never return!
  */
-static int
-main_fn(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     int rc;
 
@@ -2631,19 +2635,6 @@ main_fn(int argc, char **argv)
     }
     /* os start should never return. If it does, this should be an error */
     assert(0);
-
-    return 0;
-}
-
-int
-main(int argc, char **argv)
-{
-#if BABBLESIM
-    extern void bsim_init(int argc, char** argv, void *main_fn);
-    bsim_init(argc, argv, main_fn);
-#else
-    main_fn(argc, argv);
-#endif
 
     return 0;
 }

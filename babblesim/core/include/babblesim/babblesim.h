@@ -17,20 +17,10 @@
  * under the License.
  */
 
-#ifdef BABBLESIM
-#include "babblesim/babblesim.h"
-#endif
+#ifndef H_BABBLESIM_
+#define H_BABBLESIM_
 
-#include "os/mynewt.h"
+extern int main(int argc, char** argv);
+#pragma redefine_extname main main_wrapper
 
-int
-main(int argc, char **argv)
-{
-    /* Initialize OS */
-    sysinit();
-
-    while (1) {
-        os_eventq_run(os_eventq_dflt_get());
-    }
-    return 0;
-}
+#endif /* H_BABBLESIM_ */

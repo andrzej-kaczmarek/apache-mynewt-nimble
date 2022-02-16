@@ -46,8 +46,8 @@ main_clean_up_trace_wrap(void)
     return inner_main_clean_up(0);
 }
 
-void
-bsim_init(int argc, char** argv, int (*main_fn)(int argc, char **arg))
+int
+main(int argc, char** argv)
 {
         setvbuf(stdout, NULL, _IOLBF, 512);
         setvbuf(stderr, NULL, _IOLBF, 512);
@@ -64,7 +64,9 @@ bsim_init(int argc, char** argv, int (*main_fn)(int argc, char **arg))
         bs_read_function_names_from_Tsymbols(argv[0]);
 
         nrf_hw_initialize(&args->nrf_hw);
-        os_init(main_fn);
+
+        extern int main_wrapper(int argc, char** argv);
+        os_init(main_wrapper);
         os_start();
 
         while (1) {
