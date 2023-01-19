@@ -17,30 +17,8 @@
 # under the License.
 #
 
-pkg.name: nimble/controller
-pkg.description: Controller side of the nimble Bluetooth Smart stack.
-pkg.author: "Apache Mynewt <dev@mynewt.apache.org>"
-pkg.homepage: "http://mynewt.apache.org/"
-pkg.keywords:
-    - ble
-    - bluetooth
+pkg.name: nimble/lc3
+pkg.description:
 
-pkg.req_apis:
-    - ble_driver
-    - ble_transport
-    - stats
-pkg.req_apis.BLE_FEM_PA:
-    - ble_fem_pa
-pkg.req_apis.BLE_FEM_LNA:
-    - ble_fem_lna
-pkg.req_apis.BLE_FEM_ANTENNA:
-    - ble_fem_antenna
-
-pkg.deps:
-    - "@apache-mynewt-core/kernel/os"
-    - "@apache-mynewt-core/crypto/tinycrypt"
-    - nimble
-    - nimble/transport
-
-pkg.deps.BLE_LL_ISO:
-    - nimble/lc3
+pkg.cflags: -O3 -std=c11 -ffast-math -Wno-array-bounds
+pkg.lflags: -lm
