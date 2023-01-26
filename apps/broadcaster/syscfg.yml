@@ -1,0 +1,119 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+syscfg.defs:
+    STATIC_CONFIG:
+        description:
+        value: 1
+
+    GAP_APPEARANCE:
+        description: Appearance value
+        value: 0x0880
+    GAP_LOCAL_NAME:
+        description: Local name value
+        value: '"Apache NimBLE"'
+
+    BROADCAST_ID:
+        description: Broadcast ID value, will use random number if 0
+        value: 0x000000
+    BROADCAST_NAME:
+        description: Broadcast name
+        value: '"NimBLE audio"'
+    BROADCAST_CODE:
+        description: Broadcast code used for encrpytion
+        value: '"listen2nimble"'
+
+    LC3_FRAME_DURATION:
+        description: LC3 frame duration
+        value: 10000
+    LC3_SAMPLING_FREQ:
+        description: LC3 sampling frequency
+        value: 24000
+    LC3_BITRATE:
+        description: LC3 bitrate
+        value: 48000
+
+    BIG_PHY:
+        description:
+        value: 3
+    BIG_NUM_BIS:
+        description: Max number of BISes used
+        value: 2
+    BIG_BN:
+        description: BIG BN (burst number)
+        value: 2
+    BIG_IRC:
+        description: BIG IRC (immediate repetition count)
+        value: 2
+    BIG_PTO:
+        description: BIG PTO (pre-transmission offset)
+        value: 1
+    BIG_PT:
+        description: number of pretransmissions in BIG event
+        value: 1
+    BIG_PACKING:
+        description: Arrangement of BIS subevents (0 = sequential, 1 = interleaved)
+        value: 1
+    BIG_ENCRYPTION:
+        description: BIS encryption
+        value: 0
+
+syscfg.vals:
+    HARDFLOAT: 1
+    MAIN_STACK_SIZE: 768
+    OS_MAIN_STACK_SIZE: 1536
+    OS_CRASH_FILE_LINE: 1
+    MSYS_2_BLOCK_COUNT: 32
+    MSYS_2_BLOCK_SIZE: 260
+    SHELL_TASK: 1
+    CONFIG_FCB2: 1
+
+    UART_0: 0
+    CONSOLE_UART: 0
+    CONSOLE_USB: 1
+    CONSOLE_STICKY_PROMPT: 1
+    CONSOLE_PROMPT_SOFT_CURSOR: 1
+    CONSOLE_PROMPT_SOFT_CURSOR_ATTR: '"30;42m"'
+    CONSOLE_HISTORY: log
+    CONSOLE_HISTORY_LOG_NAME: '"reboot_log"'
+    CONSOLE_HISTORY_AUTO_SEARCH: 1
+    CONSOLE_HISTORY_LOG_CACHE_SIZE: 4096
+
+    LOG_FCB: 1
+    LOG_VERSION: 3
+    REBOOT_LOG_FCB: 1
+
+    USBD_VID: 0xc0de
+    USBD_PID: 0x150b
+    USBD_VENDOR_STRING: '"Codecoup"'
+    USBD_PRODUCT_STRING: '"NimBLE ISO Broadcaster"'
+    USBD_AUDIO_OUT: 1
+    USB_AUDIO_OUT_CHANNELS: 2
+    USB_AUDIO_OUT_SAMPLE_RATE: MYNEWT_VAL(LC3_SAMPLING_FREQ)
+
+    BLE_HS_GAP_UNHANDLED_HCI_EVENT: 1
+
+syscfg.vals.TINYUSB:
+    USBD_STACK_SIZE: 500
+    USBD_STD_DESCRIPTORS: 0
+
+syscfg.vals.CONSOLE_USB:
+    USBD_CDC: 1
+
+$import:
+    - "@apache-mynewt-nimble/apps/broadcaster/syscfg.usb.yml"
