@@ -250,6 +250,37 @@ static const uint8_t g_ble_phy_t_rxenddelay[BLE_PHY_NUM_MODE] = {
 };
 #endif
 
+//static const uint8_t pdu_tx_start_delay[BLE_PHY_NUM_MODE] = {
+//    [BLE_PHY_1M] = 6,
+//    [BLE_PHY_2M] = 5,
+//    [BLE_PHY_MODE_CODED_125KBPS] = 6,
+//    [BLE_PHY_MODE_CODED_500KBPS] = 0,
+//};
+//
+//static const uint8_t pdu_tx_address_delay[BLE_PHY_NUM_MODE] = {
+//    [BLE_PHY_1M] = 7,
+//    [BLE_PHY_2M] = 5,
+//    [BLE_PHY_MODE_CODED_125KBPS] = 18,
+//    [BLE_PHY_MODE_CODED_500KBPS] = 0,
+//};
+//
+//static const uint8_t pdu_tx_end_delay[BLE_PHY_NUM_MODE] = {
+//    [BLE_PHY_1M] = 6,
+//    [BLE_PHY_2M] = 5,
+//    [BLE_PHY_MODE_CODED_125KBPS] = 10,
+//    [BLE_PHY_MODE_CODED_500KBPS] = 0,
+//};
+
+static const uint16_t pdu_start_to_addr_us[] = {
+    [BLE_PHY_MODE_1M] = (BLE_LL_PDU_PREAMBLE_1M_LEN + BLE_LL_PDU_AA_LEN) * 8,
+    [BLE_PHY_MODE_2M] = (BLE_LL_PDU_PREAMBLE_2M_LEN + BLE_LL_PDU_AA_LEN) * 4,
+    /* FIXME preamble+aa is 80+256us on LE Coded but this makes tx-tx off by 8us
+     *       let's just adjust for now until proper fix is found
+     */
+    [BLE_PHY_MODE_CODED_125KBPS] = 80 + 256 - 18,
+    [BLE_PHY_MODE_CODED_500KBPS] = 80 + 256 - 8,
+};
+
 /* Statistics */
 STATS_SECT_START(ble_phy_stats)
     STATS_SECT_ENTRY(phy_isrs)
@@ -1108,21 +1139,19 @@ ble_phy_tx_end_isr(void)
              * captured in CC[2].
              */
             tx_time = NRF_TIMER0->CC[2] + g_ble_phy_data.txtx_time_us;
+            /* Adjust for delay between EVENT_END and actual TX end time */
+            tx_time += g_ble_phy_t_txenddelay[tx_phy_mode];
         } else {
             /* Schedule next TX relative to current TX start. AA timestamp is
-             * captured in CC[1], we need to adjust for sync word to get TX
-             * start.
+             * captured in CC[1], we need to adjust it to PDU start.
              */
-            tx_time = NRF_TIMER0->CC[1] - ble_ll_pdu_syncword_us(tx_phy_mode) +
+            tx_time = NRF_TIMER0->CC[1] - pdu_start_to_addr_us[tx_phy_mode] +
                       g_ble_phy_data.txtx_time_us;
             /* Adjust for delay between EVENT_ADDRESS and actual address TX time */
             /* FIXME assume this is the same as EVENT_END to end, but we should
              *       measure this to be sure */
             tx_time += g_ble_phy_t_txenddelay[tx_phy_mode];
         }
-
-        /* Adjust for delay between EVENT_END and actual TX end time */
-        tx_time += g_ble_phy_t_txenddelay[tx_phy_mode];
 
 #if PHY_USE_FEM_PA
         fem_time = tx_time - MYNEWT_VAL(BLE_FEM_PA_TURN_ON_US);
