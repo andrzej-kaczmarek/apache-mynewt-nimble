@@ -32,7 +32,6 @@ extern "C" {
 #define BLE_LL_PDU_HEADER_LEN       (2)
 #define BLE_LL_PDU_CRC_LEN          (3)
 
-uint32_t ble_ll_pdu_syncword_us(uint8_t phy_mode);
 uint32_t ble_ll_pdu_us(uint8_t payload_len, uint8_t phy_mode);
 
 #ifdef __cplusplus

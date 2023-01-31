@@ -246,6 +246,16 @@ static const uint8_t g_ble_phy_t_rxenddelay[BLE_PHY_NUM_MODE] = {
 };
 #endif
 
+static const uint16_t pdu_start_to_addr_us[] = {
+    [BLE_PHY_MODE_1M] = (BLE_LL_PDU_PREAMBLE_1M_LEN + BLE_LL_PDU_AA_LEN) * 8,
+    [BLE_PHY_MODE_2M] = (BLE_LL_PDU_PREAMBLE_2M_LEN + BLE_LL_PDU_AA_LEN) * 4,
+    /* FIXME preamble+aa is 80+256us on LE Coded but this makes tx-tx off by 8us
+     *       let's just adjust for now until proper fix is found
+     */
+    [BLE_PHY_MODE_CODED_125KBPS] = 80 + 256 - 8,
+    [BLE_PHY_MODE_CODED_500KBPS] = 80 + 256 - 8,
+};
+
 /* Statistics */
 STATS_SECT_START(ble_phy_stats)
     STATS_SECT_ENTRY(phy_isrs)
@@ -1104,10 +1114,9 @@ ble_phy_tx_end_isr(void)
             tx_time = NRF_TIMER0->CC[2] + g_ble_phy_data.txtx_time_us;
         } else {
             /* Schedule next TX relative to current TX start. AA timestamp is
-             * captured in CC[1], we need to adjust for sync word to get TX
-             * start.
+             * captured in CC[1], we need to adjust it to PDU start.
              */
-            tx_time = NRF_TIMER0->CC[1] - ble_ll_pdu_syncword_us(tx_phy_mode) +
+            tx_time = NRF_TIMER0->CC[1] - pdu_start_to_addr_us[tx_phy_mode] +
                       g_ble_phy_data.txtx_time_us;
         }
 

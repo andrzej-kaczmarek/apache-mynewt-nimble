@@ -20,13 +20,6 @@
 #include <controller/ble_phy.h>
 #include <controller/ble_ll_pdu.h>
 
-static const uint16_t syncword_len[] = {
-    [BLE_PHY_MODE_1M] = (BLE_LL_PDU_PREAMBLE_1M_LEN + BLE_LL_PDU_AA_LEN) * 8,
-    [BLE_PHY_MODE_2M] = (BLE_LL_PDU_PREAMBLE_2M_LEN + BLE_LL_PDU_AA_LEN) * 4,
-    [BLE_PHY_MODE_CODED_125KBPS] = 80 + 256 + 16 + 24,
-    [BLE_PHY_MODE_CODED_500KBPS] = 80 + 256 + 16 + 24,
-};
-
 static const uint16_t payload0_len[] = {
     [BLE_PHY_MODE_1M] = (BLE_LL_PDU_PREAMBLE_1M_LEN + BLE_LL_PDU_AA_LEN +
                          BLE_LL_PDU_HEADER_LEN + BLE_LL_PDU_CRC_LEN) * 8,
@@ -44,12 +37,6 @@ static const uint8_t us_per_octet[] = {
     [BLE_PHY_MODE_CODED_125KBPS] = 64,
     [BLE_PHY_MODE_CODED_500KBPS] = 16,
 };
-
-uint32_t
-ble_ll_pdu_syncword_us(uint8_t phy_mode)
-{
-    return syncword_len[phy_mode];
-}
 
 uint32_t
 ble_ll_pdu_us(uint8_t payload_len, uint8_t phy_mode)
