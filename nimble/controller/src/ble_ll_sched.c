@@ -101,19 +101,6 @@ preempt_none(struct ble_ll_sched_item *sch,
     return 0;
 }
 
-static int
-preempt_any_except_conn(struct ble_ll_sched_item *sch,
-                        struct ble_ll_sched_item *item)
-{
-    BLE_LL_ASSERT(sch->sched_type == BLE_LL_SCHED_TYPE_CONN);
-
-    if (item->sched_type != BLE_LL_SCHED_TYPE_CONN) {
-        return 1;
-    }
-
-    return ble_ll_conn_is_lru(sch->cb_arg, item->cb_arg);
-}
-
 static inline int
 ble_ll_sched_check_overlap(struct ble_ll_sched_item *sch1,
                            struct ble_ll_sched_item *sch2)
@@ -385,7 +372,7 @@ ble_ll_sched_conn_reschedule(struct ble_ll_conn_sm *connsm)
         return -1;
     }
 
-    rc = ble_ll_sched_insert(sch, 0, preempt_any_except_conn);
+    rc = ble_ll_sched_insert(sch, 0, preempt_none);
 #if MYNEWT_VAL(BLE_LL_CONN_STRICT_SCHED)
     /* Store new anchor point for strict scheduling if successfully scheduled
      * reference connection.
