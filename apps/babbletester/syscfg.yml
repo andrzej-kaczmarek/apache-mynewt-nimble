@@ -1,0 +1,39 @@
+syscfg.vals:
+    # DEBUG logging is a bit noisy; use INFO.
+    LOG_LEVEL: 0
+
+    # Default task settings
+    OS_MAIN_STACK_SIZE: 512
+
+    # Disable peripheral and broadcaster roles.
+    BLE_ROLE_BROADCASTER: 1
+    BLE_ROLE_CENTRAL: 1
+    BLE_ROLE_OBSERVER: 1
+    BLE_ROLE_PERIPHERAL: 1
+
+    # Enable/disable LE 2M PHY support
+    BLE_LL_CFG_FEAT_LE_2M_PHY: 1
+    BLE_LL_CONN_PHY_PREFER_2M: 0
+            
+    # Enable extended and periodic adv. (extended is required by periodic)
+    BLE_EXT_ADV: 1
+    BLE_PERIODIC_ADV: 1
+    BLE_MAX_PERIODIC_SYNCS: 2
+
+    # Max advertising data size
+    BLE_EXT_ADV_MAX_SIZE: 1650
+
+    BLE_LL_PUBLIC_DEV_ADDR: 0xbabb1e000002
+    
+    BLE_LL_CFG_FEAT_LE_ENCRYPTION: 0
+    BLE_LL_CFG_FEAT_LL_PRIVACY: 0
+    BLE_SM: 0
+
+    # Number of multi-advertising instances. Note that due
+    # to historical reasons total number of advertising
+    # instances is BLE_MULTI_ADV_INSTANCES + 1 as instance
+    # 0 is always available
+    BLE_MULTI_ADV_INSTANCES: 1
+
+    # Whether to save data to sys/config, or just keep it in RAM.
+    BLE_STORE_CONFIG_PERSIST: 0
