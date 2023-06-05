@@ -1944,42 +1944,48 @@ ble_ll_sync_periodic_ind(struct ble_ll_conn_sm *connsm,
                          uint16_t max_skip, uint32_t sync_timeout)
 {
     const uint8_t *syncinfo = sync_ind + 2;
-    uint16_t sync_conn_event_count;
-    uint16_t last_pa_event_count;
+    uint16_t sync_conn_event_cntr;
+    uint16_t last_pa_event_cntr;
     struct ble_ll_sync_sm *sm;
-    uint16_t conn_event_count;
+    uint16_t conn_event_cntr;
     uint8_t sync_anchor_usecs;
     const uint8_t *rpa = NULL;
-    int last_pa_diff;
+    int16_t pa_event_cntr_diff;
     uint32_t sync_anchor;
     const uint8_t *addr;
-    uint16_t event_cntr;
-    uint32_t itvl_usecs;
+    uint16_t pa_event_cntr;
+    uint32_t pa_itvl_usecs;
     uint32_t ww_adjust;
     uint8_t addr_type;
     uint8_t phy_mode;
-    uint32_t offset;
+    uint32_t offset_us;
     uint32_t future;
-    uint16_t itvl;
+    uint16_t pa_itvl;
     int rpa_index;
     uint8_t sid;
-    uint8_t sca;
+    uint8_t remote_sca;
     os_sr_t sr;
 
     phy_mode = ble_ll_ctrl_phy_from_phy_mask(sync_ind[25]);
-    itvl = get_le16(syncinfo + 2);
+    pa_itvl = get_le16(syncinfo + 2);
     /* ignore if sync params are not valid */
-    if ((phy_mode == 0) || (itvl < 6)) {
+    if ((phy_mode == 0) || (pa_itvl < 6)) {
         return;
     }
 
-    last_pa_event_count = get_le16(sync_ind + 22);
-    event_cntr = get_le16(syncinfo + 16);
-    itvl_usecs = itvl * BLE_LL_SYNC_ITVL_USECS;
+    last_pa_event_cntr = get_le16(sync_ind + 22);
+    pa_event_cntr = get_le16(syncinfo + 16);
+    pa_itvl_usecs = pa_itvl * BLE_LL_SYNC_ITVL_USECS;
 
-    last_pa_diff = abs((int16_t)(event_cntr - last_pa_event_count));
-    /* check if not 5 seconds apart, if so ignore sync transfer */
-    if ((last_pa_diff * itvl_usecs) > 5000000) {
+    pa_event_cntr_diff = (int16_t)(pa_event_cntr - last_pa_event_cntr);
+
+    /* lastPaEventCounter and paEventCounter "shall be equal, shall have a
+     * difference of 1 (modulo 65536), or shall represent times not more than 5
+     * seconds apart.
+     */
+    if ((pa_event_cntr != last_pa_event_cntr) &&
+        (abs(pa_event_cntr_diff) != 1) &&
+        (abs(pa_event_cntr_diff) * pa_itvl_usecs > 5000000)) {
         return;
     }
 
@@ -2033,28 +2039,28 @@ ble_ll_sync_periodic_ind(struct ble_ll_conn_sm *connsm,
     /* Sync Packet Offset (13 bits), Offset Units (1 bit), Offset Adjust (1 bit),
      * RFU (1 bit)
      */
-    offset = syncinfo[0];
-    offset |= (uint16_t)(syncinfo[1] & 0x1f) << 8;
+    offset_us = syncinfo[0];
+    offset_us |= (uint16_t)(syncinfo[1] & 0x1f) << 8;
 
     if (syncinfo[1] & 0x20) {
         if (syncinfo[1] & 0x40) {
-            offset += 0x2000;
+            offset_us += 0x2000;
         }
 
-        offset *= 300;
+        offset_us *= 300;
         sm->flags |= BLE_LL_SYNC_SM_FLAG_OFFSET_300;
     } else {
-        offset *= 30;
+        offset_us *= 30;
         sm->flags &= ~BLE_LL_SYNC_SM_FLAG_OFFSET_300;
     }
 
     /* sync end event */
     ble_npl_event_init(&sm->sync_ev_end, ble_ll_sync_event_end, sm);
 
-    sm->itvl = itvl;
+    sm->itvl = pa_itvl;
 
     /* precalculate interval ticks and usecs */
-    sm->itvl_ticks = ble_ll_tmr_u2t_r(itvl_usecs, &sm->itvl_usecs);
+    sm->itvl_ticks = ble_ll_tmr_u2t_r(pa_itvl_usecs, &sm->itvl_usecs);
 
     /* Channels Mask (37 bits) */
     sm->chan_map[0] = syncinfo[4];
@@ -2078,7 +2084,7 @@ ble_ll_sync_periodic_ind(struct ble_ll_conn_sm *connsm,
     sm->crcinit |= syncinfo[15] << 16;
 
     /* Event Counter (2 bytes) */
-    sm->event_cntr = event_cntr;
+    sm->event_cntr = pa_event_cntr;
 
     /* adjust skip if pass timeout */
     max_skip = get_max_skip(sm->itvl * BLE_LL_SYNC_ITVL_USECS, sync_timeout);
@@ -2088,41 +2094,66 @@ ble_ll_sync_periodic_ind(struct ble_ll_conn_sm *connsm,
 
     sm->phy_mode = phy_mode;
 
-    /* Calculate channel index of first event */
+    uint16_t caa = ble_ll_utils_sca_to_ppm(syncinfo[8] >> 5);
+    uint16_t cab = ble_ll_utils_sca_to_ppm(sync_ind[24] >> 5);
+    uint16_t cac = MYNEWT_VAL(BLE_LL_SCA);
+
+    /* Reference connection event pointing to reference AUX_SYNC_IND */
+    uint16_t ceref = get_le16(sync_ind + 20); /* connEventCount */
+    uint16_t pea = get_le16(syncinfo + 16); /* paEventCounter */
+
+    uint16_t cet = connsm->event_cntr;
+
+    /* Connection event before AUX_SYNC_IND we want to receive */
+    uint16_t cec = connsm->event_cntr;
+    uint16_t pec;
+
+    int ce_diff = (int16_t)(ceref - cec);
+    int itvl_offset = ce_diff * connsm->conn_itvl + offset_us / BLE_LL_SYNC_ITVL_USECS;
+    int pa_itvl_diff = itvl_offset / pa_itvl;
+    pec = pea - pa_itvl_diff;
+
+    sm->event_cntr = pec;
     sm->chan_index = ble_ll_utils_dci_csa2(sm->event_cntr, sm->channel_id,
                                            sm->chan_map_used, sm->chan_map);
 
-    /* get anchor for specified conn event */
-    conn_event_count = get_le16(sync_ind + 20);
-    ble_ll_conn_get_anchor(connsm, conn_event_count, &sm->anchor_point,
-                           &sm->anchor_point_usecs);
+    ble_ll_hci_ev_send_vs_printf(0xaa, "cec=%d pec=%d", cec, pec);
 
-    /* Set last anchor point */
-    sm->last_anchor_point = sm->anchor_point - (last_pa_diff * sm->itvl_ticks);
+    uint32_t tnominal;
+    tnominal = (int16_t)(ceref - cec) * connsm->conn_itvl * BLE_LL_CONN_ITVL_USECS +
+               offset_us - (int16_t)(pea - pec) * sm->itvl * BLE_LL_SYNC_ITVL_USECS;
 
-    /* calculate extra window widening */
-    sync_conn_event_count = get_le16(sync_ind + 32);
-    sca = sync_ind[24] >> 5;
-    ble_ll_conn_get_anchor(connsm, sync_conn_event_count, &sync_anchor,
-                           &sync_anchor_usecs);
-    ww_adjust = ble_ll_utils_calc_window_widening(connsm->anchor_point,
-                                                  sync_anchor, sca);
+    uint16_t peb = get_le16(sync_ind + 22); /* lastPaEventCounter */
+    uint16_t ces = get_le16(sync_ind + 32); /* syncConnEventCount */
 
-    /* spin until we get anchor in future */
-    future = ble_ll_tmr_get() + g_ble_ll_sched_offset_ticks;
-    while (LL_TMR_LT(sm->anchor_point, future)) {
-        if (ble_ll_sync_next_event(sm, ww_adjust) < 0) {
-            /* release SM if this failed */
-            ble_ll_sync_transfer_received(sm, BLE_ERR_CONN_ESTABLISHMENT);
-            memset(sm, 0, sizeof(*sm));
-            return;
-        }
-    }
+    ble_ll_conn_get_anchor(connsm, cec,
+                           &sm->anchor_point, &sm->anchor_point_usecs);
+    ble_ll_tmr_add(&sm->anchor_point, &sm->anchor_point_usecs, tnominal);
+    sm->last_anchor_point = sm->anchor_point;
+
+    (void)ww_adjust;
+    (void)future;
+    (void)ces;
+    (void)peb;
+    (void)remote_sca;
+    (void)sync_anchor;
+    (void)sync_anchor_usecs;
+    (void)conn_event_cntr;
+    (void)sync_conn_event_cntr;
+
+    uint32_t da = abs((int16_t)(pec - peb)) * pa_itvl_usecs * (caa + cac) / 1000000;
+    uint32_t db = abs((int16_t)(cet - ces)) * connsm->conn_itvl_usecs * (cab + cac) / 1000000;
+    uint32_t d = (da + db) * (1 + caa + cab + cac) / 1000000;
+
+    sm->window_widening = BLE_LL_JITTER_USECS + d;
+
+    ble_ll_hci_ev_send_vs_printf(0xaa, "tnom=%d da=%d db=%d d=%d ww=%d",
+                                 tnominal, da, db, d, sm->window_widening);
 
     ble_ll_sync_sched_set(&sm->sch, sm->anchor_point, sm->anchor_point_usecs,
-                          offset, sm->phy_mode);
+                          0, sm->phy_mode);
 
-    if (ble_ll_sched_sync(&sm->sch)) {
+    if (ble_ll_sched_sync_reschedule(&sm->sch, sm->window_widening)) {
         /* release SM if this failed */
         ble_ll_sync_transfer_received(sm, BLE_ERR_CONN_ESTABLISHMENT);
         memset(sm, 0, sizeof(*sm));

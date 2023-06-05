@@ -48,3 +48,5 @@ uint16_t ble_ll_utils_dci_iso_subevent(uint16_t chan_id, uint16_t *prn_sub_lu,
 uint32_t ble_ll_utils_calc_window_widening(uint32_t anchor_point,
                                            uint32_t last_anchor_point,
                                            uint8_t central_sca);
+
+uint16_t ble_ll_utils_sca_to_ppm(uint8_t sca);

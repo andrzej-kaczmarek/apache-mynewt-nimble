@@ -477,3 +477,13 @@ ble_ll_utils_calc_window_widening(uint32_t anchor_point,
 
     return window_widening;
 }
+
+uint16_t
+ble_ll_utils_sca_to_ppm(uint8_t sca)
+{
+    if (sca >= ARRAY_SIZE(g_ble_sca_ppm_tbl)) {
+        return 0;
+    }
+
+    return g_ble_sca_ppm_tbl[sca];
+}
