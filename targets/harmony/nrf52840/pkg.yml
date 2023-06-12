@@ -1,0 +1,4 @@
+pkg.name: targets/harmony/nrf52840
+pkg.type: target
+pkg.deps:
+  - targets/harmony/config
