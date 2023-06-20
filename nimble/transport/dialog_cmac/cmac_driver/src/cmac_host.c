@@ -77,7 +77,6 @@ cmac2sys_isr(void)
 {
 #if MYNEWT_VAL(CMAC_DEBUG_COREDUMP_ENABLE)
     volatile struct cmac_coredump *cd = &g_cmac_shared_data->coredump;
-    const char *assert_file;
 #endif
 
     os_trace_isr_enter();
@@ -96,10 +95,10 @@ cmac2sys_isr(void)
             console_printf("  assert:0x%08lx\n", cd->assert);
             if (cd->assert_file) {
                 /* Need to translate pointer from M0 code segment to M33 data */
-                assert_file = cd->assert_file + MCU_MEM_SYSRAM_START_ADDRESS +
-                              MEMCTRL->CMI_CODE_BASE_REG;
+                cd->assert_file += MCU_MEM_SYSRAM_START_ADDRESS +
+                                   MEMCTRL->CMI_CODE_BASE_REG;
                 console_printf("         %s:%d\n",
-                               assert_file, (unsigned)cd->assert_line);
+                               cd->assert_file, (unsigned)cd->assert_line);
             }
         }
         console_printf("  0x%08lx CM_ERROR_REG\n", cd->CM_ERROR_REG);
