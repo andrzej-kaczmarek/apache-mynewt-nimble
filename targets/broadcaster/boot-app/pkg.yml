@@ -1,0 +1,4 @@
+pkg.name: "targets/broadcaster/boot-app"
+pkg.type: target
+pkg.deps:
+  - "@apache-mynewt-core/hw/usb/tinyusb/msc_fat_view"

@@ -1,0 +1,6 @@
+target.app: "@apache-mynewt-nimble/apps/broadcaster"
+#target.bsp: "@apache-mynewt-core/hw/bsp/nordic_pca10121"
+target.bsp: "@apache-mynewt-core/hw/bsp/nordic_thingy53"
+target.build_profile: debug
+target.package_profiles:
+  '@apache-mynewt-nimble/nimble/lc3': speed

@@ -1,0 +1,4 @@
+pkg.name: targets/broadcaster/net
+pkg.type: target
+pkg.deps.'BLE_FEM_PA || BLE_FEM_LNA':
+  - "@apache-mynewt-nimble/nimble/drivers/fem/nrf21540"
