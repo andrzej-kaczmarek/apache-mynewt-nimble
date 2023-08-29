@@ -25,6 +25,8 @@
 #include "nimble/nimble_opt.h"
 #include "host/ble_hs.h"
 #include "host/ble_dtm.h"
+#include "nrf_oscillators.h"
+#include "tfm/tfm.h"
 #include <img_mgmt/img_mgmt.h>
 #include <bootutil/image.h>
 
@@ -205,6 +207,70 @@ cmd_set_antenna(int argc, char **argv)
     return 0;
 }
 
+static void
+hfxo_int_cap_set(unsigned int intcap)
+{
+    uint32_t xosc32mtrim;
+    uint32_t slope_field;
+    uint32_t slope_mask;
+    uint32_t slope_sign;
+    int32_t slope;
+    uint32_t offset;
+    uint32_t capvalue;
+
+    if (tfm_ficr_xosc32mtrim_read(&xosc32mtrim) != 0) {
+        /* TODO assert? */
+        return;
+    }
+
+    nrf_oscillators_hfxo_cap_set(NRF_OSCILLATORS, false, 0);
+
+    /* The SLOPE field is in the two's complement form, hence this special
+     * handling. Ideally, it would result in just one SBFX instruction for
+     * extracting the slope value, at least gcc is capable of producing such
+     * output, but since the compiler apparently tries first to optimize
+     * additions and subtractions, it generates slightly less than optimal
+     * code.
+     */
+    slope_field = (xosc32mtrim & FICR_XOSC32MTRIM_SLOPE_Msk) >> FICR_XOSC32MTRIM_SLOPE_Pos;
+    slope_mask = FICR_XOSC32MTRIM_SLOPE_Msk >> FICR_XOSC32MTRIM_SLOPE_Pos;
+    slope_sign = (slope_mask - (slope_mask >> 1));
+    slope = (int32_t)(slope_field ^ slope_sign) - (int32_t)slope_sign;
+    offset = (xosc32mtrim & FICR_XOSC32MTRIM_OFFSET_Msk) >> FICR_XOSC32MTRIM_OFFSET_Pos;
+
+    /* As specified in the nRF5340 PS:
+     * CAPVALUE = (((FICR->XOSC32MTRIM.SLOPE+56)*(CAPACITANCE*2-14))
+     *            +((FICR->XOSC32MTRIM.OFFSET-8)<<4)+32)>>6;
+     * where CAPACITANCE is the desired capacitor value in pF, holding any
+     * value between 7.0 pF and 20.0 pF in 0.5 pF steps.
+     */
+    capvalue = ((slope + 56) * (intcap - 14) + ((offset - 8) << 4) + 32) >> 6;
+
+    nrf_oscillators_hfxo_cap_set(NRF_OSCILLATORS, true, capvalue);
+}
+
+static int
+cmd_hfxo_intcap(int argc, char **argv)
+{
+    uint8_t intcap;
+    int rc;
+
+    rc = parse_arg_all(argc - 1, argv + 1);
+    if (rc != 0) {
+        return rc;
+    }
+
+    intcap = parse_arg_uint8_dflt("doubled_intcap",0 , &rc);
+    if (rc != 0 || (intcap < 14 || intcap > 40)) {
+        console_printf("invalid doubled intcap\n");
+        return rc;
+    }
+
+    hfxo_int_cap_set(intcap);
+
+    return 0;
+}
+
 static const struct shell_param cmd_rx_test_params[] = {
     {"channel", "RX channel, usage: =[0-39]"},
     {"phy", "usage: =[1M|2M], default: 1M"},
@@ -260,6 +326,17 @@ static const struct shell_cmd_help cmd_set_antenna_help = {
     .params = cmd_set_antenna_params,
 };
 
+static const struct shell_param cmd_hfxo_intcap_params[] = {
+    {"doubled_intcap", "Doubled int capacity =[14-40]"},
+    {NULL}
+};
+
+static const struct shell_cmd_help cmd_hfxo_intcap_help = {
+    .summary = "set doubled intcap for XFXO",
+    .usage = NULL,
+    .params = cmd_hfxo_intcap_params,
+};
+
 static const struct shell_cmd dtm_commands[] = {
     {
         .sc_cmd = "rx-test",
@@ -285,6 +362,11 @@ static const struct shell_cmd dtm_commands[] = {
         .sc_cmd = "set-antenna",
         .sc_cmd_func = cmd_set_antenna,
         .help = &cmd_set_antenna_help,
+    },
+    {
+        .sc_cmd = "hfxo-intcap",
+        .sc_cmd_func = cmd_hfxo_intcap,
+        .help = &cmd_hfxo_intcap_help,
     },
     { }
 };
