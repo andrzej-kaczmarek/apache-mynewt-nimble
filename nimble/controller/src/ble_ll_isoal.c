@@ -186,6 +186,36 @@ ble_ll_isoal_mux_event_done(struct ble_ll_isoal_mux *mux)
 
     mux->sdu_in_event = 0;
 
+    /* XXX this is a temporary hack to avoid running out of iso buffers.
+     * basically if after an event we have more sdus queued that required per
+     * single interval, we drop one more event in advance as it likely means
+     * host pushed too many packets.
+     */
+    num_sdu = 0;
+    pkthdr = STAILQ_FIRST(&mux->sdu_q);
+    while (pkthdr) {
+        num_sdu++;
+        pkthdr = STAILQ_NEXT(pkthdr, omp_next);
+    }
+
+    if (num_sdu > mux->sdu_per_interval) {
+        num_sdu = mux->sdu_per_interval;
+        pkthdr = STAILQ_FIRST(&mux->sdu_q);
+        while (pkthdr && num_sdu--) {
+            om = OS_MBUF_PKTHDR_TO_MBUF(pkthdr);
+
+            while (om) {
+                om_next = SLIST_NEXT(om, om_next);
+                os_mbuf_free(om);
+                pkt_freed++;
+                om = om_next;
+            }
+
+            STAILQ_REMOVE_HEAD(&mux->sdu_q, omp_next);
+            pkthdr = STAILQ_FIRST(&mux->sdu_q);
+        }
+    }
+
     return pkt_freed;
 }
 
