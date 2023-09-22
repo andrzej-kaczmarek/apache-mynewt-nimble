@@ -43,12 +43,13 @@ extern struct app_data g_app_data;
 
 #define AUDIO_CHANNELS          MYNEWT_VAL(USB_AUDIO_OUT_CHANNELS)
 #define AUDIO_SAMPLE_SIZE       sizeof(int16_t)
+#define AUDIO_PCM_SAMPLE_RATE   48000
 
 #if MYNEWT_VAL(STATIC_CONFIG)
 #define LC3_FRAME_DURATION      (MYNEWT_VAL(LC3_FRAME_DURATION))
 #define LC3_SAMPLING_FREQ       (MYNEWT_VAL(LC3_SAMPLING_FREQ))
 #define LC3_BITRATE             (MYNEWT_VAL(LC3_BITRATE))
-#define LC3_FPDT                (LC3_SAMPLING_FREQ * LC3_FRAME_DURATION / 1000000)
+#define LC3_FPDT                (AUDIO_PCM_SAMPLE_RATE * LC3_FRAME_DURATION / 1000000)
 #define BIG_NUM_BIS             (MIN(AUDIO_CHANNELS, MYNEWT_VAL(BIG_NUM_BIS)))
 #define BIG_BN                  (MYNEWT_VAL(BIG_BN))
 #define BIG_IRC                 (MYNEWT_VAL(BIG_IRC))

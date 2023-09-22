@@ -297,16 +297,19 @@ audio_usb_init(void)
 
     ble_gap_event_listener_register(&gap_listener, gap_listener_func, NULL);
 
-    usb_desc_sample_rate_set(LC3_SAMPLING_FREQ);
+    usb_desc_sample_rate_set(AUDIO_PCM_SAMPLE_RATE);
 
-    assert(LC3_FPDT == lc3_frame_samples(LC3_FRAME_DURATION, LC3_SAMPLING_FREQ));
+    assert(LC3_FPDT == lc3_frame_samples(LC3_FRAME_DURATION,
+                                         AUDIO_PCM_SAMPLE_RATE));
 
     memset(samples, 0xaa, sizeof(samples));
 
-    unsigned esize = lc3_encoder_size(LC3_FRAME_DURATION, LC3_SAMPLING_FREQ);
+    unsigned esize = lc3_encoder_size(LC3_FRAME_DURATION,
+                                      AUDIO_PCM_SAMPLE_RATE);
     for (int i = 0; i < AUDIO_CHANNELS; i++) {
         chans[i].encoder = calloc(1, esize);
-        lc3_setup_encoder(LC3_FRAME_DURATION, LC3_SAMPLING_FREQ, 0,
+        lc3_setup_encoder(LC3_FRAME_DURATION, LC3_SAMPLING_FREQ,
+                          AUDIO_PCM_SAMPLE_RATE,
                           chans[i].encoder);
     }
 

@@ -125,7 +125,7 @@ on_ch_set_ext(int argc, char **argv, char *val, void *arg)
 static int
 on_ch_commit_ext(void *arg)
 {
-    g_app_data.lc3_afpdt = LC3_SAMPLING_FREQ * LC3_FRAME_DURATION / 1000000;
+    g_app_data.lc3_afpdt = AUDIO_PCM_SAMPLE_RATE * LC3_FRAME_DURATION / 1000000;
     g_app_data.lc3_frame_bytes = lc3_frame_bytes(LC3_FRAME_DURATION, LC3_BITRATE);
     g_app_data.big_num_bis = MIN(AUDIO_CHANNELS, g_app_cfg.big_num_bis);
     g_app_data.big_sdu = g_app_data.lc3_frame_bytes *
