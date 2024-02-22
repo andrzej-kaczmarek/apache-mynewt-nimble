@@ -243,6 +243,9 @@ extern STATS_SECT_DECL(ble_ll_stats) ble_ll_stats;
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
 #define BLE_LL_STATE_BIG            (9)
 #endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+#define BLE_LL_STATE_BIG_SYNC       (10)
+#endif
 
 /* LL Features */
 #define BLE_LL_FEAT_LE_ENCRYPTION       (0x0000000000001)

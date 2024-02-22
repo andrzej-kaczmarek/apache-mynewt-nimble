@@ -1,0 +1,57 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+syscfg.vals:
+    HARDFLOAT: 1
+    MAIN_STACK_SIZE: 768
+    OS_MAIN_STACK_SIZE: 1536
+    OS_CRASH_FILE_LINE: 1
+    MSYS_2_BLOCK_COUNT: 32
+    MSYS_2_BLOCK_SIZE: 260
+    SHELL_TASK: 1
+    CONFIG_FCB2: 1
+    LOG_FCB: 1
+    LOG_VERSION: 3
+    REBOOT_LOG_FCB: 1
+
+    UART_0: 1
+    CONSOLE_UART: 1
+    CONSOLE_UART_BAUD: 1000000
+    CONSOLE_STICKY_PROMPT: 1
+    CONSOLE_PROMPT_SOFT_CURSOR: 1
+    CONSOLE_PROMPT_SOFT_CURSOR_ATTR: '"30;42m"'
+    CONSOLE_HISTORY: log
+    CONSOLE_HISTORY_LOG_NAME: '"reboot_log"'
+    CONSOLE_HISTORY_AUTO_SEARCH: 1
+    CONSOLE_HISTORY_LOG_CACHE_SIZE: 4096
+
+    BLE_MONITOR_RTT: 1
+    BLE_MONITOR_RTT_BUFFER_SIZE: 4096
+    BLE_HS_GAP_UNHANDLED_HCI_EVENT: 1
+
+syscfg.vals.BLE_CONTROLLER:
+    BLE_LL_CFG_FEAT_LE_2M_PHY: 1
+    BLE_LL_NUM_SCAN_DUP_ADVS: 64
+    BLE_LL_ISO: 1
+    BLE_LL_ISO_BROADCASTER: 1
+    BLE_LL_ISO_BROADCAST_RECEIVER: 1
+
+    BLE_LL_DEBUG_GPIO_SCHED_RUN: 42
+    BLE_PHY_DBG_TIME_TXRXEN_READY_PIN: 43
+    BLE_PHY_DBG_TIME_ADDRESS_END_PIN: 44
+    BLE_PHY_DBG_TIME_WFR_PIN: 45

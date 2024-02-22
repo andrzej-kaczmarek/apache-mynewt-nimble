@@ -990,7 +990,7 @@ struct ble_hci_le_big_create_sync_cp {
     uint8_t mse;
     uint16_t sync_timeout;
     uint8_t num_bis;
-    uint8_t bis[0];
+    uint8_t bis[32];
 } __attribute__((packed));
 
 #define BLE_HCI_OCF_LE_BIG_TERMINATE_SYNC                (0x006c)

@@ -36,6 +36,7 @@
 #include <controller/ble_ll_utils.h>
 #include <controller/ble_ll_whitelist.h>
 #include "ble_ll_priv.h"
+#include "ble_ll_iso_big_priv.h"
 
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
 
@@ -47,35 +48,6 @@
 
 #define BIG_CONTROL_ACTIVE_CHAN_MAP     1
 #define BIG_CONTROL_ACTIVE_TERM         2
-
-struct ble_ll_iso_big;
-
-struct ble_ll_iso_bis {
-    struct ble_ll_iso_big *big;
-    uint8_t num;
-    uint16_t conn_handle;
-
-    uint32_t aa;
-    uint32_t crc_init;
-    uint16_t chan_id;
-    uint8_t iv[8];
-
-    struct {
-        uint16_t prn_sub_lu;
-        uint16_t remap_idx;
-
-        uint8_t subevent_num;
-        uint8_t n;
-        uint8_t g;
-    } tx;
-
-    struct ble_ll_isoal_mux mux;
-    uint16_t num_completed_pkt;
-
-    STAILQ_ENTRY(ble_ll_iso_bis) bis_q_next;
-};
-
-STAILQ_HEAD(ble_ll_iso_bis_q, ble_ll_iso_bis);
 
 struct big_params {
     uint8_t nse; /* 1-31 */
@@ -94,75 +66,20 @@ struct big_params {
     uint8_t broadcast_code[16];
 };
 
-struct ble_ll_iso_big {
-    struct ble_ll_adv_sm *advsm;
 
-    uint8_t handle;
-    uint8_t num_bis;
-    uint16_t iso_interval;
-    uint16_t bis_spacing;
-    uint16_t sub_interval;
-    uint8_t phy;
-    uint8_t max_pdu;
-    uint16_t max_sdu;
-    uint16_t mpt;
-    uint8_t bn; /* 1-7, mandatory 1 */
-    uint8_t pto; /* 0-15, mandatory 0 */
-    uint8_t irc; /* 1-15  */
-    uint8_t nse; /* 1-31 */
-    uint8_t interleaved : 1;
-    uint8_t framed : 1;
-    uint8_t encrypted : 1;
-    uint8_t giv[8];
-    uint8_t gskd[16];
-    uint8_t gsk[16];
-    uint8_t iv[8];
-    uint8_t gc;
-
-    uint32_t sdu_interval;
-
-    uint32_t ctrl_aa;
-    uint16_t crc_init;
-    uint8_t chan_map[BLE_LL_CHAN_MAP_LEN];
-    uint8_t chan_map_used;
-
-    uint8_t biginfo[33];
-
-    uint64_t big_counter;
-    uint64_t bis_counter;
-
-    uint32_t sync_delay;
+STAILQ_HEAD(ble_ll_iso_big_q, ble_ll_iso_big);
+static struct ble_ll_iso_big_q big_q;
     uint32_t transport_latency_us;
-    uint32_t event_start;
-    uint8_t event_start_us;
     uint32_t anchor_base_ticks;
     uint8_t anchor_base_rem_us;
     uint16_t anchor_offset;
-    struct ble_ll_sched_item sch;
-    struct ble_npl_event event_done;
 
-    struct {
-        uint16_t subevents_rem;
-        struct ble_ll_iso_bis *bis;
-    } tx;
+static os_membuf_t mb_big[ OS_MEMPOOL_SIZE(BIG_POOL_SIZE, sizeof(struct ble_ll_iso_big)) ];
+static struct os_mempool mp_big;
+static os_membuf_t mb_bis[ OS_MEMPOOL_SIZE(BIS_POOL_SIZE, sizeof(struct ble_ll_iso_bis)) ];
+static struct os_mempool mp_bis;
 
-    struct ble_ll_iso_bis_q bis_q;
 
-#if MYNEWT_VAL(BLE_LL_ISO_HCI_FEEDBACK_INTERVAL_MS)
-    uint32_t last_feedback;
-#endif
-
-    uint8_t cstf : 1;
-    uint8_t cssn : 4;
-    uint8_t control_active : 3;
-    uint16_t control_instant;
-
-    uint8_t chan_map_new_pending : 1;
-    uint8_t chan_map_new[BLE_LL_CHAN_MAP_LEN];
-
-    uint8_t term_pending : 1;
-    uint8_t term_reason : 7;
-};
 
 static struct ble_ll_iso_big big_pool[BIG_POOL_SIZE];
 static struct ble_ll_iso_bis bis_pool[BIS_POOL_SIZE];
@@ -978,6 +895,65 @@ ble_ll_iso_big_calculate_iv(struct ble_ll_iso_big *big)
     big->iv[3] = big->giv[3] ^ aa[3];
 }
 
+struct ble_ll_iso_big *
+big_ll_iso_big_find(uint8_t big_handle)
+{
+    struct ble_ll_iso_big *big;
+
+    STAILQ_FOREACH(big, &big_q, big_q_next) {
+        if (big->handle == big_handle) {
+            return big;
+        }
+    }
+
+    return NULL;
+}
+
+struct ble_ll_iso_big *
+ble_ll_iso_big_alloc(uint8_t big_handle)
+{
+    struct ble_ll_iso_big *big = NULL;
+
+    big = os_memblock_get(&mp_big);
+    if (!big) {
+        return NULL;
+    }
+
+    memset(big, 0, sizeof(*big));
+    big->handle = big_handle;
+    STAILQ_INIT(&big->bis_q);
+
+    STAILQ_INSERT_HEAD(&big_q, big, big_q_next);
+
+    return big;
+}
+
+struct ble_ll_iso_bis *
+ble_ll_iso_big_alloc_bis(struct ble_ll_iso_big *big)
+{
+    struct ble_ll_iso_bis *bis;
+
+    bis = os_memblock_get(&mp_bis);
+    if (!bis) {
+        return NULL;
+    }
+
+    memset(bis, 0, sizeof(*bis));
+    bis->big = big;
+    bis->num = ++big->num_bis;
+
+    STAILQ_INSERT_TAIL(&big->bis_q, bis, bis_q_next);
+
+    return bis;
+}
+
+void
+ble_ll_iso_big_free2(struct ble_ll_iso_big *big)
+{
+    STAILQ_REMOVE(&big_q, big, ble_ll_iso_big, big_q_next);
+    os_memblock_put(&mp_big, big);
+}
+
 static int
 ble_ll_iso_big_create(uint8_t big_handle, uint8_t adv_handle, uint8_t num_bis,
                       struct big_params *bp)
@@ -1510,6 +1486,7 @@ ble_ll_iso_big_init(void)
     struct ble_ll_iso_big *big;
     struct ble_ll_iso_bis *bis;
     uint8_t idx;
+    int rc;
 
     memset(big_pool, 0, sizeof(big_pool));
     memset(bis_pool, 0, sizeof(bis_pool));
@@ -1533,6 +1510,14 @@ ble_ll_iso_big_init(void)
 
     big_pool_free = ARRAY_SIZE(big_pool);
     bis_pool_free = ARRAY_SIZE(bis_pool);
+
+
+    rc = os_mempool_init(&mp_big, BIG_POOL_SIZE, sizeof(struct ble_ll_iso_big), mb_big, "big");
+    BLE_LL_ASSERT(rc == 0);
+    rc = os_mempool_init(&mp_bis, BIS_POOL_SIZE, sizeof(struct ble_ll_iso_bis), mb_bis, "bis");
+    BLE_LL_ASSERT(rc == 0);
+
+    STAILQ_INIT(&big_q);
 }
 
 void

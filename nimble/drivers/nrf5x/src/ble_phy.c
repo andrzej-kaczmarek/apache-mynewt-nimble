@@ -55,6 +55,7 @@
 #endif
 #include <nrf_erratas.h>
 #include "phy_priv.h"
+#include "controller/ble_ll_tmr.h"
 
 #ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -166,6 +167,10 @@ struct ble_phy_obj
 
     uint16_t txtx_time_us;
     uint8_t txtx_time_anchor;
+
+    uint8_t transition;
+    uint16_t tifs_us;
+    uint8_t tifs_anchor;
 };
 static struct ble_phy_obj g_ble_phy_data;
 
@@ -392,9 +397,18 @@ phy_nrf52_errata_191(uint8_t new_phy_mode)
 }
 #endif
 
+#define BLE_PHY_DIR_TX  0
+#define BLE_PHY_DIR_RX  1
+
 static void
-ble_phy_mode_apply(uint8_t phy_mode)
+ble_phy_apply_mode(uint8_t dir)
 {
+#if MYNEWT_VAL(BLE_LL_PHY)
+    uint8_t phy_mode;
+
+    phy_mode = (dir == BLE_PHY_DIR_RX ? g_ble_phy_data.phy_rx_phy_mode :
+                                        g_ble_phy_data.phy_tx_phy_mode);
+
     if (phy_mode == g_ble_phy_data.phy_cur_phy_mode) {
         return;
     }
@@ -443,6 +457,7 @@ ble_phy_mode_apply(uint8_t phy_mode)
     }
 
     g_ble_phy_data.phy_cur_phy_mode = phy_mode;
+#endif
 }
 
 void
@@ -871,8 +886,8 @@ wfr_enable(uint32_t wfr_us, uint8_t tx_phy_mode)
     end_time += g_ble_phy_t_rxaddrdelay[phy];
 
     /* wfr_secs is the time from rxen until timeout */
-    nrf_timer_cc_set(NRF_TIMER0, 3, end_time);
-    NRF_TIMER0->EVENTS_COMPARE[3] = 0;
+    nrf_timer_cc_set(NRF_TIMER0, NRF_TIMER_CC_CHANNEL3, end_time);
+    nrf_timer_event_clear(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE3);
 
     /* Enable wait for response PPI */
     phy_ppi_wfr_enable();
@@ -1015,6 +1030,125 @@ ble_phy_rx_xcvr_setup(void)
                          RADIO_INTENSET_DISABLED_Msk);
 }
 
+static inline uint32_t
+anchor_rxd_get(uint8_t rx_phy_mode)
+{
+    if (g_ble_phy_data.tifs_anchor) {
+        /* Anchor is time of EVENT_END captured in CC[2] adjusted for delay
+         * between the event and actual RX end time
+         */
+        return nrf_timer_cc_get(NRF_TIMER0, NRF_TIMER_CC_CHANNEL2) -
+               g_ble_phy_t_rxenddelay[rx_phy_mode];
+    } else {
+        /* Anchor is time of EVENT_ADDRESS captured in CC[1] adjusted for
+         * duration of syncword and delay between the event and actual RX end
+         * time.
+         */
+        return nrf_timer_cc_get(NRF_TIMER0, NRF_TIMER_CC_CHANNEL1) -
+               ble_ll_pdu_syncword_us(rx_phy_mode) -
+               g_ble_phy_t_rxaddrdelay[rx_phy_mode];
+    }
+}
+
+static inline uint32_t
+anchor_txd_get(uint8_t tx_phy_mode)
+{
+    if (g_ble_phy_data.tifs_anchor) {
+        /* Anchor is time of EVENT_END captured in CC[2] adjusted for delay
+         * between the event and actual TX end time
+         */
+        return nrf_timer_cc_get(NRF_TIMER0, NRF_TIMER_CC_CHANNEL2) +
+               g_ble_phy_t_txenddelay[tx_phy_mode];
+    } else {
+        /* Anchor is time of EVENT_ADDRESS captured in CC[1] adjusted for
+         * duration of syncword and delay between the event and actual TX end
+         * time.
+         *
+         * FIXME this assumes delay for EVENT_ADDRESS is the same as EVENT_END,
+         *       should be measured to be sure.
+         */
+        return nrf_timer_cc_get(NRF_TIMER0, NRF_TIMER_CC_CHANNEL1) -
+               ble_ll_pdu_syncword_us(tx_phy_mode) +
+               g_ble_phy_t_txenddelay[tx_phy_mode];
+    }
+}
+
+static void
+transition_to_tx(uint32_t anchor_us, uint8_t tx_phy_mode)
+{
+    uint32_t tx_time;
+    uint32_t radio_time;
+    uint32_t fem_time;
+    uint32_t cc_time;
+    bool is_late;
+
+    tx_time = anchor_us + g_ble_phy_data.tifs_us;
+
+#if PHY_USE_FEM_PA
+    fem_time = tx_time - MYNEWT_VAL(BLE_FEM_PA_TURN_ON_US);
+#endif
+
+    /* Adjust for delay between EVENT_READY and actual TX start time */
+    tx_time -= g_ble_phy_t_txdelay[tx_phy_mode];
+
+    radio_time = tx_time - BLE_PHY_T_TXENFAST;
+    nrf_timer_cc_set(NRF_TIMER0, NRF_TIMER_CC_CHANNEL0, radio_time);
+    nrf_timer_event_clear(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE0);
+    phy_ppi_timer0_compare0_to_radio_txen_enable();
+
+#if PHY_USE_FEM_PA
+    nrf_timer_cc_set(NRF_TIMER0, NRF_TIMER_CC_CHANNEL2, fem_time);
+    nrf_timer_event_clear(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE2);
+    phy_fem_enable_pa();
+#endif
+
+    /* Need to check if TIMER0 did not already count past CC[0] and/or CC[2], so
+     * we're not stuck waiting for events in case radio and/or PA was not
+     * started. If event was triggered we're fine regardless of timer value.
+     *
+     * Note: CC[3] is used only for wfr which we do not need here.
+     */
+    nrf_timer_task_trigger(NRF_TIMER0, NRF_TIMER_TASK_CAPTURE3);
+    cc_time = nrf_timer_cc_get(NRF_TIMER0, NRF_TIMER_CC_CHANNEL3);
+    is_late = LL_TMR_GT(cc_time, radio_time) &&
+              !nrf_timer_event_check(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE0);
+#if PHY_USE_FEM_PA
+    if (!is_late) {
+        is_late = LL_TMR_GT(cc_time, fem_time) &&
+              !nrf_timer_event_check(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE2);
+    }
+#endif
+    if (is_late) {
+        phy_ppi_timer0_compare0_to_radio_txen_disable();
+        g_ble_phy_data.phy_transition_late = 1;
+    }
+}
+
+static void
+transition_to_rx(uint32_t anchor_us, uint8_t rx_phy_mode)
+{
+    uint32_t rx_time;
+    uint32_t radio_time;
+    uint32_t fem_time;
+
+    rx_time = anchor_us + g_ble_phy_data.tifs_us;
+    /* Start listening 2us earlier due to allowed active clock accuracy */
+    rx_time -= 2;
+
+    (void)fem_time;
+#if PHY_USE_FEM_LNA
+    fem_time = rx_time - MYNEWT_VAL(BLE_FEM_LNA_TURN_ON_US);
+    nrf_timer_cc_set(NRF_TIMER0, NRF_TIMER_CC_CHANNEL2, fem_time);
+    nrf_timer_event_clear(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE2);
+    phy_fem_enable_lna();
+#endif
+
+    radio_time = rx_time - BLE_PHY_T_RXENFAST;
+    nrf_timer_cc_set(NRF_TIMER0, NRF_TIMER_CC_CHANNEL0, radio_time);
+    nrf_timer_event_clear(NRF_TIMER0, NRF_TIMER_EVENT_COMPARE0);
+    phy_ppi_timer0_compare0_to_radio_rxen_enable();
+}
+
 /**
  * Called from interrupt context when the transmit ends
  *
@@ -1030,6 +1164,7 @@ ble_phy_tx_end_isr(void)
 #if PHY_USE_FEM
     uint32_t fem_time;
 #endif
+    uint32_t anchor_us;
     uint32_t radio_time;
     uint16_t tifs;
 
@@ -1056,27 +1191,19 @@ ble_phy_tx_end_isr(void)
     }
 #endif
 
-#if MYNEWT_VAL(BLE_PHY_VARIABLE_TIFS)
-    tifs = g_ble_phy_data.tifs;
-    g_ble_phy_data.tifs = BLE_LL_IFS;
-#else
-    tifs = BLE_LL_IFS;
-#endif
-    transition = g_ble_phy_data.phy_transition;
+    anchor_us = anchor_txd_get(g_ble_phy_data.phy_cur_phy_mode);
+    transition = g_ble_phy_data.transition;
 
     if (g_ble_phy_data.txend_cb) {
         g_ble_phy_data.txend_cb(g_ble_phy_data.txend_arg);
     }
 
     if (transition == BLE_PHY_TRANSITIONX_TO_RX) {
-#if MYNEWT_VAL(BLE_LL_PHY)
-        ble_phy_mode_apply(g_ble_phy_data.phy_rx_phy_mode);
-#endif
-
-        /* Packet pointer needs to be reset. */
+        ble_phy_apply_mode(BLE_PHY_DIR_RX);
         ble_phy_rx_xcvr_setup();
-
         wfr_enable(0, tx_phy_mode);
+
+        transition_to_rx(anchor_us, )
 
         /* Schedule RX exactly T_IFS after TX end captured in CC[2] */
         rx_time = NRF_TIMER0->CC[2] + tifs;
@@ -1193,14 +1320,8 @@ ble_phy_rx_end_isr(void)
     int rc;
     uint8_t *dptr;
     uint8_t crcok;
-    uint32_t tx_time;
-#if PHY_USE_FEM_PA
-    uint32_t fem_time;
-#endif
-    uint32_t radio_time;
-    uint16_t tifs;
     struct ble_mbuf_hdr *ble_hdr;
-    bool is_late;
+    uint32_t anchor_us;
 
     /* Disable automatic RXEN */
     phy_ppi_timer0_compare0_to_radio_rxen_disable();
@@ -1245,10 +1366,6 @@ ble_phy_rx_end_isr(void)
 #endif
     }
 
-#if MYNEWT_VAL(BLE_LL_PHY)
-    ble_phy_mode_apply(g_ble_phy_data.phy_tx_phy_mode);
-#endif
-
     /*
      * Let's schedule TX now and we will just cancel it after processing RXed
      * packet if we don't need TX.
@@ -1263,51 +1380,11 @@ ble_phy_rx_end_isr(void)
      * enough.
      */
 
-#if MYNEWT_VAL(BLE_PHY_VARIABLE_TIFS)
-    tifs = g_ble_phy_data.tifs;
-    g_ble_phy_data.tifs = BLE_LL_IFS;
-#else
-    tifs = BLE_LL_IFS;
-#endif
-
-    /* Schedule TX exactly T_IFS after RX end captured in CC[2] */
-    tx_time = NRF_TIMER0->CC[2] + tifs;
-    /* Adjust for delay between actual RX end time and EVENT_END */
-    tx_time -= g_ble_phy_t_rxenddelay[ble_hdr->rxinfo.phy_mode];
-
-#if PHY_USE_FEM_PA
-    fem_time = tx_time - MYNEWT_VAL(BLE_FEM_PA_TURN_ON_US);
-#endif
-
-    /* Adjust for delay between EVENT_READY and actual TX start time */
-    tx_time -= g_ble_phy_t_txdelay[g_ble_phy_data.phy_cur_phy_mode];
-
-    radio_time = tx_time - BLE_PHY_T_TXENFAST;
-    nrf_timer_cc_set(NRF_TIMER0, 0, radio_time);
-    NRF_TIMER0->EVENTS_COMPARE[0] = 0;
-    phy_ppi_timer0_compare0_to_radio_txen_enable();
-
-#if PHY_USE_FEM_PA
-    nrf_timer_cc_set(NRF_TIMER0, 2, fem_time);
-    NRF_TIMER0->EVENTS_COMPARE[2] = 0;
-    phy_fem_enable_pa();
-#endif
-
-    /* Need to check if TIMER0 did not already count past CC[0] and/or CC[2], so
-     * we're not stuck waiting for events in case radio and/or PA was not
-     * started. If event was triggered we're fine regardless of timer value.
-     *
-     * Note: CC[3] is used only for wfr which we do not need here.
-     */
-    nrf_timer_task_trigger(NRF_TIMER0, NRF_TIMER_TASK_CAPTURE3);
-    is_late = (NRF_TIMER0->CC[3] > radio_time) && !NRF_TIMER0->EVENTS_COMPARE[0];
-#if PHY_USE_FEM_PA
-    is_late = is_late ||
-              ((NRF_TIMER0->CC[3] > fem_time) && !NRF_TIMER0->EVENTS_COMPARE[2]);
-#endif
-    if (is_late) {
-        phy_ppi_timer0_compare0_to_radio_txen_disable();
-        g_ble_phy_data.phy_transition_late = 1;
+    anchor_us = anchor_rxd_get(ble_hdr->rxinfo.phy_mode);
+    if (g_ble_phy_data.transition == BLE_PHY_TRANSITION_TX) {
+        transition_to_tx(anchor_us, g_ble_phy_data.phy_tx_phy_mode);
+    } else if (g_ble_phy_data.transition == BLE_PHY_TRANSITION_RX) {
+        transition_to_rx(anchor_us, g_ble_phy_data.phy_rx_phy_mode);
     }
 
     /*
@@ -1813,9 +1890,7 @@ ble_phy_tx_set_start_time(uint32_t cputime, uint8_t rem_usecs)
 
     ble_phy_trace_u32x2(BLE_PHY_TRACE_ID_START_TX, cputime, rem_usecs);
 
-#if MYNEWT_VAL(BLE_LL_PHY)
-    ble_phy_mode_apply(g_ble_phy_data.phy_tx_phy_mode);
-#endif
+    ble_phy_apply_mode(BLE_PHY_DIR_TX);
 
     /* XXX: This should not be necessary, but paranoia is good! */
     /* Clear timer0 compare to RXEN since we are transmitting */
@@ -1855,9 +1930,7 @@ ble_phy_rx_set_start_time(uint32_t cputime, uint8_t rem_usecs)
 
     ble_phy_trace_u32x2(BLE_PHY_TRACE_ID_START_RX, cputime, rem_usecs);
 
-#if MYNEWT_VAL(BLE_LL_PHY)
-    ble_phy_mode_apply(g_ble_phy_data.phy_rx_phy_mode);
-#endif
+    ble_phy_apply_mode(BLE_PHY_DIR_RX);
 
     /* XXX: This should not be necessary, but paranoia is good! */
     /* Clear timer0 compare to TXEN since we are transmitting */
@@ -2207,6 +2280,9 @@ ble_phy_disable(void)
 #if PHY_USE_FEM
     phy_fem_disable();
 #endif
+
+    g_ble_phy_data.transition = 0;
+    g_ble_phy_data.tifs_us = 0;
 }
 
 /* Gets the current access address */

@@ -61,6 +61,8 @@ struct os_mbuf;
 #define BLE_PHY_STATE_RX            (1)
 #define BLE_PHY_STATE_TX            (2)
 
+#define BLE_PHY_TRANSITION_TX       4
+#define BLE_PHY_TRANSITION_RX       5
 /* PHY error codes */
 #define BLE_PHY_ERR_RADIO_STATE     (1)
 #define BLE_PHY_ERR_INIT            (2)
@@ -86,8 +88,8 @@ uint8_t ble_phy_chan_get(void);
 /* Set T_ifs time for next transition */
 void ble_phy_tifs_set(uint16_t tifs);
 #endif
-#define BLE_PHY_TRANSITIONX_NONE    0
-#define BLE_PHY_TRANSITIONX_TO_TX   1
+
+void ble_phy_transition_set(uint8_t trans);
 #define BLE_PHY_TRANSITIONX_TO_RX   2
 
 

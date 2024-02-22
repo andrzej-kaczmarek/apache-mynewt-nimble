@@ -515,7 +515,13 @@ syscfg.defs:
             - BLE_LL_ISO if 1
         value: 0
         state: experimental
-
+    BLE_LL_ISO_BROADCAST_RECEIVER:
+        description: >
+            Enable support for Isochronous Broadcasting state.
+        restrictions:
+            - BLE_LL_ISO if 1
+        value: 1
+        state: experimental
     BLE_LL_ISO_HCI_FEEDBACK_INTERVAL_MS:
         description: >
             Enables ISO synchronization feedback using vendor-specific HCI event.

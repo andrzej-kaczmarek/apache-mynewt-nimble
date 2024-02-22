@@ -41,9 +41,12 @@
 #include "ble_ll_priv.h"
 #include "ble_ll_conn_priv.h"
 #include "ble_ll_hci_priv.h"
+#include "controller/ble_ll_iso_big_sync.h"
 
 #if MYNEWT_VAL(BLE_LL_DTM)
 #include "ble_ll_dtm_priv.h"
+#include "controller/ble_ll_iso_big_sync.h"
+
 #endif
 
 static void ble_ll_hci_cmd_proc(struct ble_npl_event *ev);
@@ -1285,6 +1288,11 @@ ble_ll_hci_le_cmd_proc(const uint8_t *cmdbuf, uint8_t len, uint16_t ocf,
         rc = ble_ll_iso_big_hci_terminate(cmdbuf, len);
         break;
 #endif /* BLE_LL_ISO_BROADCASTER */
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    case BLE_HCI_OCF_LE_BIG_CREATE_SYNC:
+        rc = ble_ll_iso_big_sync_hci_create(cmdbuf, len);
+        break;
+#endif /* BLE_LL_ISO_BROADCAST_RECEIVER */
 #if MYNEWT_VAL(BLE_LL_ISO)
     case BLE_HCI_OCF_LE_SETUP_ISO_DATA_PATH:
         rc = ble_ll_isoal_hci_setup_iso_data_path(cmdbuf, len, rspbuf, rsplen);

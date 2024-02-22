@@ -38,6 +38,7 @@
 #endif
 #include "ble_ll_priv.h"
 #include "ble_ll_conn_priv.h"
+#include "controller/ble_ll_iso_big_sync.h"
 
 #define BLE_LL_SCHED_MAX_DELAY_ANY      (0x7fffffff)
 
@@ -865,6 +866,25 @@ ble_ll_sched_iso_big(struct ble_ll_sched_item *sch, int first, int fixed)
 }
 #endif /* BLE_LL_ISO_BROADCASTER */
 
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+int
+ble_ll_sched_iso_big_sync(struct ble_ll_sched_item *sch)
+{
+    os_sr_t sr;
+    int rc;
+
+    OS_ENTER_CRITICAL(sr);
+
+    rc = ble_ll_sched_insert(sch, 0, preempt_none);
+
+    OS_EXIT_CRITICAL(sr);
+
+    ble_ll_sched_restart();
+
+    return rc;
+}
+#endif
+
 /**
  * Remove a schedule element
  *
@@ -1008,6 +1028,11 @@ ble_ll_sched_execute_item(struct ble_ll_sched_item *sch)
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
     case BLE_LL_STATE_BIG:
         ble_ll_iso_big_halt();
+        break;
+#endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    case BLE_LL_STATE_BIG_SYNC:
+        ble_ll_iso_big_sync_halt();
         break;
 #endif
 #if MYNEWT_VAL(BLE_LL_EXT)

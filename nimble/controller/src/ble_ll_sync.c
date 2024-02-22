@@ -126,6 +126,11 @@ struct ble_ll_sync_sm {
 #if MYNEWT_VAL(BLE_LL_CFG_FEAT_LL_PERIODIC_ADV_ADI_SUPPORT)
     uint16_t prev_adi;
 #endif
+
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    ble_ll_sync_biginfo_cb_t biginfo_cb;
+    void *biginfo_cb_arg;
+#endif
 };
 
 static struct ble_ll_sync_sm g_ble_ll_sync_sm[BLE_LL_SYNC_CNT];
@@ -1108,7 +1113,7 @@ ble_ll_sync_check_acad(struct ble_ll_sync_sm *sm,
             sm->flags |= BLE_LL_SYNC_SM_FLAG_NEW_CHANMAP;
             break;
 
-#if MYNEWT_VAL(BLE_LL_PERIODIC_ADV_SYNC_BIGINFO_REPORTS)
+#if MYNEWT_VAL(BLE_LL_PERIODIC_ADV_SYNC_BIGINFO_REPORTS) || MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
         case BLE_LL_ACAD_BIGINFO:
             if ((ad_len - 1 == BLE_LL_SYNC_BIGINFO_LEN) || (ad_len - 1 == BLE_LL_SYNC_BIGINFO_LEN_ENC)) {
                 *biginfo = &acad[2];
@@ -1230,6 +1235,12 @@ ble_ll_sync_rx_pkt_in(struct os_mbuf *rxpdu, struct ble_mbuf_hdr *hdr)
     if (sm->flags & BLE_LL_SYNC_SM_FLAG_ESTABLISHING) {
         ble_ll_sync_established(sm);
     }
+
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    if (biginfo && sm->biginfo_cb) {
+        sm->biginfo_cb(sm, hdr->beg_cputime, hdr->rem_usecs, biginfo, biginfo_len, sm->biginfo_cb_arg);
+    }
+#endif
 
     /* only if reporting is enabled */
     if (reports_enabled) {
@@ -2383,6 +2394,36 @@ ble_ll_sync_rmvd_from_sched(struct ble_ll_sync_sm *sm)
 {
     ble_ll_event_add(&sm->sync_ev_end);
 }
+
+struct ble_ll_sync_sm *
+ble_ll_sync_get(uint8_t handle)
+{
+    struct ble_ll_sync_sm *syncsm;
+
+    if (handle >= BLE_LL_SYNC_CNT) {
+        return NULL;
+    }
+
+    syncsm = &g_ble_ll_sync_sm[handle];
+
+    if (!syncsm->flags) {
+        return NULL;
+    }
+
+    return syncsm;
+}
+
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+int
+ble_ll_sync_biginfo_cb_set(struct ble_ll_sync_sm *syncsm,
+                           ble_ll_sync_biginfo_cb_t cb, void *cb_arg)
+{
+    syncsm->biginfo_cb = cb;
+    syncsm->biginfo_cb_arg = cb_arg;
+
+    return 0;
+}
+#endif
 
 bool
 ble_ll_sync_enabled(void)

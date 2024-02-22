@@ -52,6 +52,7 @@
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
 #include "controller/ble_ll_iso_big.h"
 #endif
+#include "controller/ble_ll_iso_big_sync.h"
 #if MYNEWT_VAL(BLE_LL_EXT)
 #include "controller/ble_ll_ext.h"
 #endif
@@ -804,6 +805,11 @@ ble_ll_wfr_timer_exp(void *arg)
             ble_ll_ext_wfr_timer_exp();
             break;
 #endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+        case BLE_LL_STATE_BIG_SYNC:
+            ble_ll_iso_big_sync_wfr_timer_exp();
+            break;
+#endif
         default:
             break;
         }
@@ -984,6 +990,11 @@ ble_ll_rx_pkt_in(void)
             ble_ll_ext_rx_pkt_in(m, ble_hdr);
             break;
 #endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+        case BLE_LL_STATE_BIG_SYNC:
+            ble_ll_iso_big_sync_rx_pkt_in(m, ble_hdr);
+            break;
+#endif
         default:
             /* Any other state should never occur */
             STATS_INC(ble_ll_stats, bad_ll_state);
@@ -1135,6 +1146,11 @@ ble_ll_rx_start(uint8_t *rxbuf, uint8_t chan, struct ble_mbuf_hdr *rxhdr)
         rc = ble_ll_ext_rx_isr_start(pdu_type, rxhdr);
         break;
 #endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    case BLE_LL_STATE_BIG_SYNC:
+        rc = ble_ll_iso_big_sync_rx_isr_start(pdu_type, rxhdr);
+        break;
+#endif
     default:
         /* Should not be in this state! */
         rc = -1;
@@ -1177,6 +1193,13 @@ ble_ll_rx_end(uint8_t *rxbuf, struct ble_mbuf_hdr *rxhdr)
 
     ble_ll_trace_u32x3(BLE_LL_TRACE_ID_RX_END, pdu_type, len,
                        rxhdr->rxinfo.flags);
+
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    if (BLE_MBUF_HDR_RX_STATE(rxhdr) == BLE_LL_STATE_BIG_SYNC) {
+        rc = ble_ll_iso_big_sync_rx_isr_end(rxbuf, rxhdr);
+        return rc;
+    }
+#endif
 
 #if MYNEWT_VAL(BLE_LL_EXT)
     if (BLE_MBUF_HDR_RX_STATE(rxhdr) == BLE_LL_STATE_EXTERNAL) {
@@ -1691,6 +1714,9 @@ ble_ll_reset(void)
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
     ble_ll_iso_big_reset();
 #endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    ble_ll_iso_big_sync_reset();
+#endif
 
     /* Re-initialize the PHY */
     rc = ble_phy_init();
@@ -1932,6 +1958,9 @@ ble_ll_init(void)
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
     features |= BLE_LL_FEAT_ISO_BROADCASTER;
 #endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    features |= BLE_LL_FEAT_SYNC_RECV;
+#endif
 
 #if MYNEWT_VAL(BLE_LL_CFG_FEAT_LL_ENHANCED_CONN_UPDATE)
     features |= BLE_LL_FEAT_CONN_SUBRATING;
@@ -1972,6 +2001,9 @@ ble_ll_init(void)
 #endif
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
     ble_ll_iso_big_init();
+#endif
+#if MYNEWT_VAL(BLE_LL_ISO_BROADCAST_RECEIVER)
+    ble_ll_iso_big_sync_init();
 #endif
 
 #if MYNEWT_VAL(BLE_LL_EXT)
