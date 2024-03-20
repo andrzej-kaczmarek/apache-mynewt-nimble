@@ -628,7 +628,9 @@ ble_ll_adv_put_syncinfo(struct ble_ll_adv_sm *advsm,
 #endif
     unsigned int event_cnt_off = 0;
     uint32_t offset = 0;
-    uint32_t anchor;
+    uint32_t itvl_us;
+    uint32_t anchor_ticks;
+    uint8_t anchor_rem_us;
     uint8_t units;
 
     if (connsm) {
@@ -650,21 +652,23 @@ ble_ll_adv_put_syncinfo(struct ble_ll_adv_sm *advsm,
         put_le16(conn_event_cnt, conn_cnt);
 #endif
     } else {
-        anchor = advsm->periodic_adv_event_start_time;
+        anchor_ticks = advsm->periodic_adv_event_start_time;
+        anchor_rem_us = advsm->periodic_adv_event_start_time_remainder;
+        itvl_us = advsm->periodic_adv_itvl * BLE_LL_ADV_PERIODIC_ITVL;
 
         /* Get periodic event that is past AUX start time (so that we always
          * provide valid offset if it is not too far in future). This can
          * happen if advertising event is interleaved with periodic advertising
          * event (when chaining).
          */
-        while (LL_TMR_GT(AUX_CURRENT(advsm)->start_time, anchor)) {
-            anchor += advsm->periodic_adv_itvl_ticks;
+        while (LL_TMR_GEQ(AUX_CURRENT(advsm)->start_time, anchor_ticks)) {
+            ble_ll_tmr_add(&anchor_ticks, &anchor_rem_us, itvl_us);
             event_cnt_off++;
         }
 
-        offset = ble_ll_tmr_t2u(anchor - AUX_CURRENT(advsm)->start_time);
-        offset += advsm->periodic_adv_event_start_time_remainder;
-        offset += advsm->periodic_adv_itvl_rem_us;
+        /* We always schedule aux with 0 rem_us so no need to include it here */
+        offset = ble_ll_tmr_t2u(anchor_ticks - AUX_CURRENT(advsm)->start_time);
+        offset += anchor_rem_us;
     }
 
     /* Sync Packet Offset (13 bits), Offset Units (1 bit), Offset Adjust (1 bit),
