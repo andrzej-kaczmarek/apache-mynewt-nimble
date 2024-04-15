@@ -819,23 +819,8 @@ ble_phy_set_start_now(void)
     return 0;
 }
 
-/**
- * Function is used to set PPI so that we can time out waiting for a reception
- * to occur. This happens for two reasons: we have sent a packet and we are
- * waiting for a response (txrx should be set to ENABLE_TXRX) or we are
- * starting a connection event and we are a slave and we are waiting for the
- * master to send us a packet (txrx should be set to ENABLE_RX).
- *
- * NOTE: when waiting for a txrx turn-around, wfr_usecs is not used as there
- * is no additional time to wait; we know when we should receive the address of
- * the received frame.
- *
- * @param txrx Flag denoting if this wfr is a txrx turn-around or not.
- * @param tx_phy_mode phy mode for last TX (only valid for TX->RX)
- * @param wfr_usecs Amount of usecs to wait.
- */
-void
-ble_phy_wfr_enable(int txrx, uint8_t tx_phy_mode, uint32_t wfr_usecs)
+static void
+wfr_enable(uint32_t wfr_us, uint8_t tx_phy_mode)
 {
     uint32_t end_time;
     uint8_t phy;
@@ -849,7 +834,7 @@ ble_phy_wfr_enable(int txrx, uint8_t tx_phy_mode, uint32_t wfr_usecs)
     tifs = BLE_LL_IFS;
 #endif
 
-    if (txrx == BLE_PHY_WFR_ENABLE_TXRX) {
+    if (wfr_us == 0) {
         /* RX shall start exactly T_IFS after TX end captured in CC[2] */
         end_time = NRF_TIMER0->CC[2] + tifs;
         /* Adjust for delay between EVENT_END and actual TX end time */
@@ -871,7 +856,7 @@ ble_phy_wfr_enable(int txrx, uint8_t tx_phy_mode, uint32_t wfr_usecs)
          * CC[0] is the time of RXEN so adjust for radio ram-up.
          * Do not add jitter since this is already covered by LL.
          */
-        end_time = NRF_TIMER0->CC[0] + BLE_PHY_T_RXENFAST + wfr_usecs;
+        end_time = NRF_TIMER0->CC[0] + BLE_PHY_T_RXENFAST + wfr_us;
     }
 
     /*
@@ -909,6 +894,12 @@ ble_phy_wfr_enable(int txrx, uint8_t tx_phy_mode, uint32_t wfr_usecs)
         phy_ppi_wfr_disable();
         nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_DISABLE);
     }
+}
+
+void
+ble_phy_wfr_enable(uint32_t wfr_us)
+{
+    wfr_enable(wfr_us, 0);
 }
 
 #if MYNEWT_VAL(BLE_LL_CFG_FEAT_LE_ENCRYPTION)
@@ -1085,7 +1076,7 @@ ble_phy_tx_end_isr(void)
         /* Packet pointer needs to be reset. */
         ble_phy_rx_xcvr_setup();
 
-        ble_phy_wfr_enable(BLE_PHY_WFR_ENABLE_TXRX, tx_phy_mode, 0);
+        wfr_enable(0, tx_phy_mode);
 
         /* Schedule RX exactly T_IFS after TX end captured in CC[2] */
         rx_time = NRF_TIMER0->CC[2] + tifs;

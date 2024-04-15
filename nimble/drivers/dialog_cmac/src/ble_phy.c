@@ -593,7 +593,7 @@ ble_phy_irq_field_tx_exc_bs_start_4this(void)
         CMAC->CM_EV_LINKUP_REG = CMAC_CM_EV_LINKUP_REG_LU_PHY_TO_IDLE_2_EXC_Msk |
                                  CMAC_CM_EV_LINKUP_REG_LU_FRAME_START_2_PHY_TO_IDLE_Msk;
 
-        ble_phy_wfr_enable(BLE_PHY_WFR_ENABLE_TXRX, g_ble_phy_data.phy_mode_rx, 0);
+        ble_phy_wfr_enable(0);
     } else {
         CMAC->CM_EV_LINKUP_REG = CMAC_CM_EV_LINKUP_REG_LU_PHY_TO_IDLE_2_EXC_Msk |
                                  CMAC_CM_EV_LINKUP_REG_LU_FRAME_START_2_NONE_Msk;
@@ -1126,7 +1126,7 @@ ble_phy_rxpdu_copy(uint8_t *dptr, struct os_mbuf *rxpdu)
 }
 
 void
-ble_phy_wfr_enable(int txrx, uint8_t tx_phy_mode, uint32_t wfr_usecs)
+ble_phy_wfr_enable(uint32_t wfr_us)
 {
     uint64_t llt;
     uint32_t corr_window;
@@ -1145,14 +1145,11 @@ ble_phy_wfr_enable(int txrx, uint8_t tx_phy_mode, uint32_t wfr_usecs)
     aa_time = 45;
 #endif
 
-    if (txrx == BLE_PHY_WFR_ENABLE_TXRX) {
-        CMAC_SETREGF(CM_PHY_CTRL2_REG, CORR_WINDOW, aa_time);
-        CMAC->CM_EV_LINKUP_REG = CMAC_CM_EV_LINKUP_REG_LU_CORR_TMR_LD_2_CORR_START_Msk;
-    } else if (wfr_usecs < 16384) {
-        CMAC_SETREGF(CM_PHY_CTRL2_REG, CORR_WINDOW, wfr_usecs + aa_time);
+    if (wfr_us < 16384) {
+        CMAC_SETREGF(CM_PHY_CTRL2_REG, CORR_WINDOW, wfr_us + aa_time);
         CMAC->CM_EV_LINKUP_REG = CMAC_CM_EV_LINKUP_REG_LU_CORR_TMR_LD_2_CORR_START_Msk;
     } else {
-        wfr_usecs += aa_time;
+        wfr_us += aa_time;
         llt = g_ble_phy_data.llt_rx_start;
 
         /*
@@ -1161,10 +1158,10 @@ ble_phy_wfr_enable(int txrx, uint8_t tx_phy_mode, uint32_t wfr_usecs)
          * value (does not really matter, just had to pick something) so need to
          * calculate how many hi-Z ticks of delay we need.
          */
-        llt_z_ticks = (wfr_usecs - 10000) / 1024;
+        llt_z_ticks = (wfr_us - 10000) / 1024;
 
         /* New CORR_WINDOW is wfr adjusted by hi-Z ticks and remainder of 1st tick. */
-        corr_window = wfr_usecs;
+        corr_window = wfr_us;
         corr_window -= llt_z_ticks * 1024;
         corr_window -= 1024 - (llt & 0x3ff);
 

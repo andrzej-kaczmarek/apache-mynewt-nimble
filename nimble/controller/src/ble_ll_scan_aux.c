@@ -165,7 +165,7 @@ ble_ll_scan_aux_sched_cb(struct ble_ll_sched_item *sch)
         ble_ll_whitelist_disable();
     }
 
-    ble_phy_wfr_enable(BLE_PHY_WFR_ENABLE_RX, 0, aux->wfr_us);
+    ble_phy_wfr_enable(aux->wfr_us);
 
     aux_data_current = aux;
 

@@ -1610,7 +1610,7 @@ ble_ll_conn_event_start_cb(struct ble_ll_sched_item *sch)
              */
             usecs = connsm->periph_cur_tx_win_usecs + 61 +
                     (2 * connsm->periph_cur_window_widening);
-            ble_phy_wfr_enable(BLE_PHY_WFR_ENABLE_RX, 0, usecs);
+            ble_phy_wfr_enable(usecs);
             /* Set next wakeup time to connection event end time */
             rc = BLE_LL_SCHED_STATE_RUNNING;
         }
