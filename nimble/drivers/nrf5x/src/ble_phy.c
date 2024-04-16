@@ -1068,7 +1068,7 @@ ble_phy_tx_end_isr(void)
         g_ble_phy_data.txend_cb(g_ble_phy_data.txend_arg);
     }
 
-    if (transition == BLE_PHY_TRANSITION_TX_RX) {
+    if (transition == BLE_PHY_TRANSITIONX_TO_RX) {
 #if MYNEWT_VAL(BLE_LL_PHY)
         ble_phy_mode_apply(g_ble_phy_data.phy_rx_phy_mode);
 #endif
@@ -1104,7 +1104,7 @@ ble_phy_tx_end_isr(void)
          * FIXME failing to enable LNA may result in unexpected RSSI drop in
          *       case we still rxd something, so perhaps we could check it here
          */
-    } else if (transition == BLE_PHY_TRANSITION_TX_TX) {
+    } else if (transition == BLE_PHY_TRANSITIONX_TO_TX) {
         if (g_ble_phy_data.txtx_time_anchor) {
             /* Calculate TX anchor relative to current TX end */
 
@@ -1158,7 +1158,7 @@ ble_phy_tx_end_isr(void)
         phy_ppi_wfr_disable();
         phy_ppi_timer0_compare0_to_radio_txen_disable();
         phy_ppi_rtc0_compare0_to_timer0_start_disable();
-        assert(transition == BLE_PHY_TRANSITION_NONE);
+        assert(transition == BLE_PHY_TRANSITIONX_NONE);
     }
 }
 
@@ -1890,7 +1890,7 @@ ble_phy_rx_set_start_time(uint32_t cputime, uint8_t rem_usecs)
 }
 
 int
-ble_phy_tx(ble_phy_tx_pducb_t pducb, void *pducb_arg, uint8_t end_trans)
+ble_phy_tx(ble_phy_tx_pducb_t pducb, void *pducb_arg)
 {
     int rc;
     uint8_t *dptr;
@@ -1899,12 +1899,15 @@ ble_phy_tx(ble_phy_tx_pducb_t pducb, void *pducb_arg, uint8_t end_trans)
     uint8_t hdr_byte;
     uint32_t state;
     uint32_t shortcuts;
+    uint8_t end_trans;
 
     if (g_ble_phy_data.phy_transition_late) {
         ble_phy_disable();
         STATS_INC(ble_phy_stats, tx_late);
         return BLE_PHY_ERR_TX_LATE;
     }
+
+    end_trans = g_ble_phy_data.transition;
 
     /*
      * This check is to make sure that the radio is not in a state where
@@ -2335,6 +2338,19 @@ ble_phy_rfclk_disable(void)
 #else
     nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_HFCLKSTOP);
 #endif
+}
+
+void
+ble_phy_transition_set(uint8_t trans)
+{
+    g_ble_phy_data.transition = trans;
+}
+
+void
+ble_phy_tifs_set(uint16_t usecs, uint8_t anchor)
+{
+    g_ble_phy_data.tifs_us = usecs;
+    g_ble_phy_data.tifs_anchor = anchor;
 }
 
 void

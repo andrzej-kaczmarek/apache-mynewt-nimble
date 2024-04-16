@@ -61,12 +61,6 @@ struct os_mbuf;
 #define BLE_PHY_STATE_RX            (1)
 #define BLE_PHY_STATE_TX            (2)
 
-/* BLE PHY transitions */
-#define BLE_PHY_TRANSITION_NONE     (0)
-#define BLE_PHY_TRANSITION_RX_TX    (1)
-#define BLE_PHY_TRANSITION_TX_RX    (2)
-#define BLE_PHY_TRANSITION_TX_TX    (3)
-
 /* PHY error codes */
 #define BLE_PHY_ERR_RADIO_STATE     (1)
 #define BLE_PHY_ERR_INIT            (2)
@@ -92,6 +86,10 @@ uint8_t ble_phy_chan_get(void);
 /* Set T_ifs time for next transition */
 void ble_phy_tifs_set(uint16_t tifs);
 #endif
+#define BLE_PHY_TRANSITIONX_NONE    0
+#define BLE_PHY_TRANSITIONX_TO_TX   1
+#define BLE_PHY_TRANSITIONX_TO_RX   2
+
 
 /* Set T_ifs for tx-tx transitions. Anchor is 0 for start of previous PDU,
  * non-zero for end of PDU */
@@ -110,7 +108,7 @@ typedef uint8_t (*ble_phy_tx_pducb_t)(uint8_t *dptr, void *pducb_arg,
                                       uint8_t *hdr_byte);
 
 /* Place the PHY into transmit mode */
-int ble_phy_tx(ble_phy_tx_pducb_t pducb, void *pducb_arg, uint8_t end_trans);
+int ble_phy_tx(ble_phy_tx_pducb_t pducb, void *pducb_arg);
 
 /* Copies the received PHY buffer into the allocated pdu */
 void ble_phy_rxpdu_copy(uint8_t *dptr, struct os_mbuf *rxpdu);

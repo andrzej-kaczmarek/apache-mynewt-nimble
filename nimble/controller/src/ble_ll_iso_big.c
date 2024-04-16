@@ -707,7 +707,8 @@ ble_ll_iso_big_control_tx(struct ble_ll_iso_big *big)
     ble_phy_set_txend_cb(ble_ll_iso_big_control_txend_cb, big);
     ble_phy_setchan(chan_idx, big->ctrl_aa, big->crc_init << 8);
 
-    rc = ble_phy_tx(ble_ll_iso_big_control_pdu_cb, big, BLE_PHY_TRANSITION_NONE);
+    ble_phy_transition_set(BLE_PHY_TRANSITIONX_NONE);
+    rc = ble_phy_tx(ble_ll_iso_big_control_pdu_cb, big);
 
     return rc;
 }
@@ -792,9 +793,10 @@ ble_ll_iso_big_subevent_tx(struct ble_ll_iso_big *big)
 
     to_tx = (big->tx.subevents_rem > 1) || big->cstf;
 
-    rc = ble_phy_tx(ble_ll_iso_big_subevent_pdu_cb, big,
-                    to_tx ? BLE_PHY_TRANSITION_TX_TX
-                          : BLE_PHY_TRANSITION_NONE);
+    ble_phy_transition_set(to_tx ? BLE_PHY_TRANSITIONX_TO_TX :
+                                   BLE_PHY_TRANSITIONX_NONE);
+
+    rc = ble_phy_tx(ble_ll_iso_big_subevent_pdu_cb, big);
     return rc;
 }
 
