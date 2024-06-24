@@ -255,7 +255,7 @@ cmd_hfxo_intcap(int argc, char **argv)
     uint8_t intcap;
     int rc;
 
-    rc = parse_arg_all(argc - 1, argv + 1);
+    rc = parse_arg_init(argc - 1, argv + 1);
     if (rc != 0) {
         return rc;
     }
