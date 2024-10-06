@@ -68,6 +68,8 @@
 #include <controller/ble_ll_ext.h>
 #endif
 
+#include <nrfx.h>
+
 /* XXX:
  *
  * 1) use the sanity task!
@@ -1790,6 +1792,9 @@ ble_ll_init(void)
     if (ble_ll_is_addr_empty(g_dev_addr)) {
 #if MYNEWT_VAL(BLE_LL_PUBLIC_DEV_ADDR)
         pub_dev_addr = MYNEWT_VAL(BLE_LL_PUBLIC_DEV_ADDR);
+
+        pub_dev_addr &= 0xFFFFFF000000;
+        pub_dev_addr |= NRF_FICR->DEVICEADDR[0] & 0x00FFFFFF;
 
         for (i = 0; i < BLE_DEV_ADDR_LEN; i++) {
             g_dev_addr[i] = pub_dev_addr & 0xff;
