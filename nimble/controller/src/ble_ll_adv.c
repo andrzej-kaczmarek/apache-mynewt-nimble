@@ -45,6 +45,7 @@
 #include "controller/ble_ll_iso_big.h"
 #include "ble_ll_conn_priv.h"
 #include "ble_ll_priv.h"
+#include "oble/ext_sync.h"
 
 #if MYNEWT_VAL(BLE_LL_ROLE_BROADCASTER)
 
@@ -2447,6 +2448,14 @@ ble_ll_adv_periodic_schedule_first(struct ble_ll_adv_sm *advsm,
     BLE_LL_ASSERT(!advsm->periodic_sync[0].sch.enqueued);
     BLE_LL_ASSERT(!advsm->periodic_sync[1].sch.enqueued);
 
+    rc = ext_sync_anchor_get(advsm->padv_event_start, &advsm->padv_anchor,
+                             &advsm->padv_anchor_rem_us,
+                             advsm->padv_itvl_us - 10000 + 7750);
+    if (rc) {
+        advsm->padv_anchor_offset = 0;
+        first_pdu = false;
+    }
+
     advsm->periodic_sync_active = 1;
     advsm->periodic_sync_index = 0;
 
@@ -2723,6 +2732,7 @@ ble_ll_adv_sm_start_periodic(struct ble_ll_adv_sm *advsm)
     advsm->padv_anchor_offset = 1;
     advsm->padv_anchor = ble_ll_tmr_get();
     advsm->padv_anchor_rem_us = 0;
+    advsm->padv_event_start = advsm->padv_anchor;
 
     ble_ll_adv_sync_schedule(advsm, true);
 }

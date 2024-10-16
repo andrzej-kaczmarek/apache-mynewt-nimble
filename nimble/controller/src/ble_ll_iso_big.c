@@ -36,6 +36,7 @@
 #include <controller/ble_ll_utils.h>
 #include <controller/ble_ll_whitelist.h>
 #include "ble_ll_priv.h"
+#include "oble/ext_sync.h"
 
 #if MYNEWT_VAL(BLE_LL_ISO_BROADCASTER)
 
@@ -589,6 +590,15 @@ ble_ll_iso_big_event_done(struct ble_ll_iso_big *big)
         }
 
         big->anchor_offset++;
+
+        rc = ext_sync_anchor_get(big->sch.start_time + g_ble_ll_sched_offset_ticks,
+                                 &big->anchor_base_ticks,
+                                 &big->anchor_base_rem_us,
+                                 8750);
+        if (rc) {
+            big->anchor_offset = 0;
+        }
+
         big_sched_set(big);
 
         /* XXX this should always succeed since we preempt anything for now */
@@ -1129,24 +1139,31 @@ ble_ll_iso_big_create(uint8_t big_handle, uint8_t adv_handle, uint8_t num_bis,
     uint32_t sync_delay_ticks = ble_ll_tmr_u2t_up(big->sync_delay);
     int big_event_fixed;
 
-    rc = ble_ll_adv_padv_event_start_get(big->advsm, &padv_start_time, NULL);
+    rc = ext_sync_anchor_get(ble_ll_tmr_get(), &big->anchor_base_ticks,
+                             &big->anchor_base_rem_us, 8750);
     if (rc) {
-        /* 1st event will be moved by 1 interval before scheduling so this will
-         * be always in the future */
-        big_start_time = ble_ll_tmr_get();
-        big_event_fixed = 0;
-    } else {
-        /* Set 1st BIG event directly before periodic advertising event, this
-         * way it will not overlap it even if periodic advertising data changes.
-         * Make sure it's in the future.
-         */
-        big_start_time = padv_start_time - g_ble_ll_sched_offset_ticks -
-                         sync_delay_ticks - 1;
         big_event_fixed = 1;
+    } else {
+        rc = ble_ll_adv_padv_event_start_get(big->advsm, &padv_start_time, NULL);
+        if (rc) {
+            /* 1st event will be moved by 1 interval before scheduling so this will
+             * be always in the future */
+            big_start_time = ble_ll_tmr_get();
+            big_event_fixed = 0;
+        } else {
+            /* Set 1st BIG event directly before periodic advertising event, this
+             * way it will not overlap it even if periodic advertising data changes.
+             * Make sure it's in the future.
+             */
+            big_start_time = padv_start_time - g_ble_ll_sched_offset_ticks -
+                             sync_delay_ticks - 1;
+            big_event_fixed = 1;
+        }
+
+        big->anchor_base_ticks = big_start_time;
+        big->anchor_base_rem_us = 0;
     }
 
-    big->anchor_base_ticks = big_start_time;
-    big->anchor_base_rem_us = 0;
     big->anchor_offset = 0;
 
     do {
