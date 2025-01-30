@@ -451,6 +451,18 @@ ble_phy_mode_set(uint8_t tx_phy_mode, uint8_t rx_phy_mode)
     g_ble_phy_data.phy_tx_phy_mode = tx_phy_mode;
     g_ble_phy_data.phy_rx_phy_mode = rx_phy_mode;
 }
+
+uint8_t
+ble_phy_mode_tx_get(void)
+{
+    return g_ble_phy_data.phy_tx_phy_mode;
+}
+
+uint8_t
+ble_phy_mode_rx_get(void)
+{
+    return g_ble_phy_data.phy_rx_phy_mode;
+}
 #else
 static uint32_t
 ble_phy_mode_pdu_start_off(int phy_mode)

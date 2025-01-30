@@ -212,6 +212,8 @@ void ble_phy_resolv_list_disable(void);
 
 #if (MYNEWT_VAL(BLE_LL_CFG_FEAT_LE_2M_PHY) || MYNEWT_VAL(BLE_LL_CFG_FEAT_LE_CODED_PHY))
 void ble_phy_mode_set(uint8_t tx_phy_mode, uint8_t rx_phy_mode);
+uint8_t ble_phy_mode_tx_get(void);
+uint8_t ble_phy_mode_rx_get(void);
 #endif
 
 static inline int ble_ll_phy_to_phy_mode(int phy, int phy_options)
