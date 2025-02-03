@@ -101,6 +101,17 @@ preempt_none(struct ble_ll_sched_item *sch,
     return 0;
 }
 
+static int
+preempt_any_except_big(struct ble_ll_sched_item *sch,
+                       struct ble_ll_sched_item *item)
+{
+    if (item->sched_type == BLE_LL_SCHED_TYPE_BIG) {
+        return 0;
+    }
+
+    return 1;
+}
+
 extern int ble_ll_sched_preempt_conn(struct ble_ll_sched_item *sch,
                                      struct ble_ll_sched_item *item);
 
@@ -736,7 +747,7 @@ ble_ll_sched_periodic_adv(struct ble_ll_sched_item *sch, bool first_event)
         rc = ble_ll_sched_insert(sch, BLE_LL_SCHED_MAX_DELAY_ANY,
                                  preempt_none);
     } else {
-        rc = ble_ll_sched_insert(sch, 0, preempt_any);
+        rc = ble_ll_sched_insert(sch, 0, preempt_any_except_big);
     }
 
     OS_EXIT_CRITICAL(sr);
