@@ -1860,10 +1860,10 @@ ble_ll_adv_set_adv_params(const uint8_t *cmdbuf, uint8_t len)
 
         props = BLE_HCI_LE_SET_EXT_ADV_PROP_LEGACY_LD_DIR ;
         break;
+#endif
     case BLE_HCI_ADV_TYPE_ADV_IND:
         props = BLE_HCI_LE_SET_EXT_ADV_PROP_LEGACY_IND;
         break;
-#endif
     case BLE_HCI_ADV_TYPE_ADV_NONCONN_IND:
         props = BLE_HCI_LE_SET_EXT_ADV_PROP_LEGACY_NONCONN;
         break;
@@ -3514,9 +3514,9 @@ ble_ll_adv_ext_set_param(const uint8_t *cmdbuf, uint8_t len,
 
         /* if legacy bit is set possible values are limited */
         switch (props) {
-#if MYNEWT_VAL(BLE_LL_ROLE_PERIPHERAL)
         case BLE_HCI_LE_SET_EXT_ADV_PROP_LEGACY_IND:
         case BLE_HCI_LE_SET_EXT_ADV_PROP_LEGACY_LD_DIR:
+#if MYNEWT_VAL(BLE_LL_ROLE_PERIPHERAL)
         case BLE_HCI_LE_SET_EXT_ADV_PROP_LEGACY_HD_DIR:
 #endif
         case BLE_HCI_LE_SET_EXT_ADV_PROP_LEGACY_SCAN:
@@ -3527,12 +3527,12 @@ ble_ll_adv_ext_set_param(const uint8_t *cmdbuf, uint8_t len,
             goto done;
         }
     } else {
-#if !MYNEWT_VAL(BLE_LL_ROLE_PERIPHERAL)
-        if (props & BLE_HCI_LE_SET_EXT_ADV_PROP_CONNECTABLE) {
-            rc = BLE_ERR_INV_HCI_CMD_PARMS;
-            goto done;
-        }
-#endif
+// #if !MYNEWT_VAL(BLE_LL_ROLE_PERIPHERAL)
+//         if (props & BLE_HCI_LE_SET_EXT_ADV_PROP_CONNECTABLE) {
+//             rc = BLE_ERR_INV_HCI_CMD_PARMS;
+//             goto done;
+//         }
+// #endif
         /* HD directed advertising allowed only on legacy PDUs */
         if (props & BLE_HCI_LE_SET_EXT_ADV_PROP_HD_DIRECTED) {
             rc = BLE_ERR_INV_HCI_CMD_PARMS;

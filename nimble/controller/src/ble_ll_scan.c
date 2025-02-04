@@ -1618,11 +1618,13 @@ ble_ll_scan_rx_isr_end(struct os_mbuf *rxpdu, uint8_t crcok)
     rxbuf = rxpdu->om_data;
     pdu_type = rxbuf[0] & BLE_ADV_PDU_HDR_TYPE_MASK;
 
+#if 0
     if ((scansm->scanp->scan_type != BLE_SCAN_TYPE_INITIATE) &&
         (pdu_type != BLE_ADV_PDU_TYPE_SCAN_RSP) &&
         (hdr->rxinfo.rssi - ble_ll_rx_gain() < -60)) {
         goto scan_rx_isr_ignore;
     }
+#endif
 
     switch (pdu_type) {
     case BLE_ADV_PDU_TYPE_ADV_IND:
