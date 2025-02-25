@@ -1,0 +1,4 @@
+pkg.name: targets/blehci_pca10056
+pkg.type: target
+pkg.deps:
+  - configs/blehci_all_features
